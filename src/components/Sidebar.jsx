@@ -7,6 +7,8 @@ export default function Sidebar({
   setCurrentPage,
   selectedCamera,
   setSelectedCamera,
+  selectedSite,
+  setSelectedSite
 }) {
   const [expandedSites, setExpandedSites] = useState({
     dakar: true,
@@ -89,7 +91,11 @@ export default function Sidebar({
               <div key={site.id} className="rounded-2xl">
                 {/* Site header */}
                 <button
-                  onClick={() => toggleSite(site.id)}
+                  onClick={() => {
+                    toggleSite(site.id);
+                    setSelectedSite(site.id);
+                    setCurrentPage("dashboard");
+                  }}
                   className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-sm text-gray-200 transition hover:bg-gray-800/60"
                 >
                   <div className="flex min-w-0 items-center gap-2">
