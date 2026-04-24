@@ -16,3 +16,22 @@ export async function fetchKitToken(deviceId, channelId = 0) {
 
   return response.data;
 }
+
+export async function fetchDeviceOnline(deviceId) {
+  const response = await axios.post(`${BASE_URL}/device-online`, {
+    deviceId,
+  });
+  
+
+  return response.data;
+}
+export async function fetchAlerts(deviceId, channelId = 0) {
+  const response = await axios.get(`${BASE_URL}/alerts`, {
+    params: {
+      deviceId,
+      channelId,
+    },
+  });
+
+  return response.data;
+}

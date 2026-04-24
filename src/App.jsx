@@ -142,7 +142,12 @@ function App() {
                 />
               )}
 
-              {currentPage === "alerts" && <Alerts />}
+              {currentPage === "alerts" && (
+                <Alerts
+                  selectedSite={selectedSite}
+                  selectedCamera={selectedCamera}
+                />
+              )}
             </>
           )}
         </main>
