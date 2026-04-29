@@ -35,3 +35,11 @@ export async function fetchAlerts(deviceId, channelId = 0) {
 
   return response.data;
 }
+export function proxyImageUrl(originalUrl) {
+  if (!originalUrl) return null;
+  return `http://127.0.0.1:5000/image-proxy?url=${encodeURIComponent(originalUrl)}`;
+}
+export async function wakeupDevice(deviceId) {
+  const response = await axios.post(`${BASE_URL}/wakeup`, { deviceId });
+  return response.data;
+}

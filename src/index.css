@@ -1,3 +1,6 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+body.imou-fullscreen-active .imou-player-card {
+  visibility: hidden;
+}

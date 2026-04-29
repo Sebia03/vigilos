@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { fetchKitToken } from "../services/ImouService";
 
-export default function ImouPlayer({ camera }) {
+export default function ImouPlayer({ camera, onError }) {
   const containerRef = useRef(null);
   const playerRef = useRef(null);
 
@@ -48,7 +48,7 @@ export default function ImouPlayer({ camera }) {
 
         containerRef.current.innerHTML = "";
 
-        const width = containerRef.current.clientWidth;
+        const width  = containerRef.current.clientWidth;
         const height = containerRef.current.clientHeight;
 
         playerRef.current = new window.imouPlayer({
@@ -59,19 +59,19 @@ export default function ImouPlayer({ camera }) {
           deviceId: camera.deviceId,
           channelId: camera.channelId ?? 0,
           token: tokenData.kitToken,
-          type: 1,
+          type: 2,
           streamId: 0,
           bSupportMultithread: false,
         });
       } catch (err) {
         console.error("Erreur initialisation ImouPlayer :", err);
         if (!cancelled) {
-          setError(err.message || "Erreur inconnue");
+          const msg = err.message || "Erreur inconnue";
+          setError(msg);
+          if (onError) onError(msg);
         }
       } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
+        if (!cancelled) setLoading(false);
       }
     }
 
