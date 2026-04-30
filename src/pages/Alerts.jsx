@@ -1,50 +1,31 @@
 import { useEffect, useMemo, useState } from "react";
 import { fetchAlerts } from "../services/ImouService";
-import axios from "axios";
 
 const BASE_URL = "http://127.0.0.1:5000";
 
-async function fetchImageAsDataUrl(url) {
-  if (!url) return null;
-  try {
-    const res = await axios.get(`${BASE_URL}/image-proxy`, {
-      params: { url },
-    });
-    console.log("IMAGE PROXY response:", res.data);  // cette ligne doit être là
-    return res.data?.dataUrl || null;
-  } catch (e) {
-    console.log("IMAGE PROXY erreur:", e.message);
-    return null;
-  }
-}
-
-function getRawImageUrl(alert) {
-  return alert.thumbUrl || alert.picurlArray?.[0] || null;
-}
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const TYPE_CONFIG = {
-  human_detection:  { label: "Détection humaine",    color: "text-cyan-400",    bg: "bg-cyan-500/10",    border: "border-cyan-500/20",    dot: "bg-cyan-400" },
-  motion_detection: { label: "Mouvement détecté",    color: "text-amber-400",   bg: "bg-amber-500/10",   border: "border-amber-500/20",   dot: "bg-amber-400" },
-  human_infrared:   { label: "Infrarouge humain",    color: "text-purple-400",  bg: "bg-purple-500/10",  border: "border-purple-500/20",  dot: "bg-purple-400" },
-  low_voltage:      { label: "Batterie faible",       color: "text-red-400",     bg: "bg-red-500/10",     border: "border-red-500/20",     dot: "bg-red-400" },
-  unknown:          { label: "Alerte",                color: "text-gray-400",    bg: "bg-gray-500/10",    border: "border-gray-700",        dot: "bg-gray-400" },
+  human_detection:  { label: "Détection humaine",    color: "text-cyan-400",    bg: "bg-cyan-500/10",    border: "border-cyan-500/20",    dot: "bg-cyan-400",    iconBg: "bg-cyan-500/15" },
+  motion_detection: { label: "Mouvement détecté",    color: "text-amber-400",   bg: "bg-amber-500/10",   border: "border-amber-500/20",   dot: "bg-amber-400",   iconBg: "bg-amber-500/15" },
+  human_infrared:   { label: "Infrarouge humain",    color: "text-purple-400",  bg: "bg-purple-500/10",  border: "border-purple-500/20",  dot: "bg-purple-400",  iconBg: "bg-purple-500/15" },
+  low_voltage:      { label: "Batterie faible",       color: "text-red-400",     bg: "bg-red-500/10",     border: "border-red-500/20",     dot: "bg-red-400",     iconBg: "bg-red-500/15" },
+  unknown:          { label: "Alerte",                color: "text-gray-400",    bg: "bg-gray-500/10",    border: "border-gray-700",        dot: "bg-gray-400",    iconBg: "bg-gray-700/40" },
 };
 
 function getAlertType(alert) {
-  if (alert.msgType === "human"       || alert.labelType === "humanAlarm"   || alert.typeLabel === "human_detection")  return "human_detection";
-  if (alert.msgType === "videoMotion" || alert.labelType === "motionAlarm"  || alert.typeLabel === "motion_detection") return "motion_detection";
-  if (alert.typeLabel === "human_infrared") return "human_infrared";
-  if (alert.typeLabel === "low_voltage_alarm") return "low_voltage";
+  const msgType   = alert.raw?.msgType   || alert.msgType;
+  const labelType = alert.raw?.labelType || alert.labelType;
+  const typeLabel = alert.typeLabel;
+
+  if (msgType === "human"       || labelType === "humanAlarm"  || typeLabel === "human_detection")  return "human_detection";
+  if (msgType === "videoMotion" || labelType === "motionAlarm" || typeLabel === "motion_detection") return "motion_detection";
+  if (typeLabel === "human_infrared")    return "human_infrared";
+  if (typeLabel === "low_voltage_alarm") return "low_voltage";
   return "unknown";
 }
 
 function getAlertConfig(alert) {
   return TYPE_CONFIG[getAlertType(alert)] || TYPE_CONFIG.unknown;
-}
-
-function getAlertImage(alert) {
-  return getRawImageUrl(alert);
 }
 
 function formatDate(dateStr) {
@@ -61,60 +42,56 @@ function formatTime(dateStr) {
   return d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 }
 
+// ─── Icônes par type d'alerte ─────────────────────────────────────────────────
+function AlertIcon({ type, colorClass }) {
+  if (type === "human_detection" || type === "human_infrared") {
+    return (
+      <svg className={`h-12 w-12 ${colorClass}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.2}
+          d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+      </svg>
+    );
+  }
+  if (type === "motion_detection") {
+    return (
+      <svg className={`h-12 w-12 ${colorClass}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.2}
+          d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+      </svg>
+    );
+  }
+  if (type === "low_voltage") {
+    return (
+      <svg className={`h-12 w-12 ${colorClass}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.2}
+          d="M21 10.5h.375a.375.375 0 01.375.375v2.25a.375.375 0 01-.375.375H21m-9 .75h4.875a1.5 1.5 0 001.5-1.5v-6a1.5 1.5 0 00-1.5-1.5H12m-3 0V6.75m0 0H6.375A1.875 1.875 0 004.5 8.625v6.75c0 1.035.84 1.875 1.875 1.875H9m0-9.75v9.75" />
+      </svg>
+    );
+  }
+  return (
+    <svg className={`h-12 w-12 ${colorClass}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.2}
+        d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
+    </svg>
+  );
+}
+
 // ─── Alert Card ───────────────────────────────────────────────────────────────
 function AlertCard({ alert }) {
-  const cfg         = getAlertConfig(alert);
-  const rawImageUrl = getAlertImage(alert);
-  const dateStr     = alert.raw?.localDate || alert.localDate || null;
-  const [dataUrl, setDataUrl]   = useState(null);
-  const [imgLoading, setImgLoading] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-    if (!rawImageUrl) { setImgLoading(false); return; }
-    setImgLoading(true);
-    fetchImageAsDataUrl(rawImageUrl).then((url) => {
-      if (!cancelled) {
-        setDataUrl(url);
-        setImgLoading(false);
-      }
-    });
-    return () => { cancelled = true; };
-  }, [rawImageUrl]);
+  const cfg     = getAlertConfig(alert);
+  const type    = getAlertType(alert);
+  const dateStr = alert.raw?.localDate || alert.localDate || null;
 
   return (
     <div className={`overflow-hidden rounded-xl border bg-gray-900 transition hover:scale-[1.01] hover:shadow-lg hover:shadow-black/30 ${cfg.border}`}>
-      {/* Image */}
-      <div className="relative h-44 w-full bg-gray-800">
-        {imgLoading ? (
-          <div className="flex h-full w-full items-center justify-center">
-            <svg className="h-6 w-6 animate-spin text-gray-600" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 00-8 8h4z" />
-            </svg>
-          </div>
-        ) : dataUrl ? (
-          <>
-            <img
-              src={dataUrl}
-              alt={cfg.label}
-              className="h-full w-full object-cover"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-          </>
-        ) : (
-          <div className="flex h-full w-full items-center justify-center">
-            <div className="text-center">
-              <svg className="mx-auto h-8 w-8 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1}
-                  d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
-              </svg>
-              <p className="mt-2 text-xs text-gray-600">Image indisponible</p>
-            </div>
-          </div>
-        )}
-
-        {/* Badge type en haut à gauche */}
+      {/* Zone visuelle */}
+      <div className={`relative flex h-44 w-full items-center justify-center ${cfg.iconBg}`}>
+        {/* Cercles décoratifs */}
+        <div className={`absolute h-32 w-32 rounded-full opacity-20 ${cfg.bg}`} />
+        <div className={`absolute h-20 w-20 rounded-full opacity-30 ${cfg.bg}`} />
+        {/* Icône */}
+        <AlertIcon type={type} colorClass={cfg.color} />
+        {/* Badge type */}
         <div className={`absolute left-2 top-2 flex items-center gap-1.5 rounded-full border px-2.5 py-1 ${cfg.bg} ${cfg.border}`}>
           <span className={`h-1.5 w-1.5 rounded-full ${cfg.dot}`} />
           <span className={`text-[11px] font-medium ${cfg.color}`}>{cfg.label}</span>
@@ -185,25 +162,21 @@ export default function Alerts({ selectedCamera = null, selectedSite = null }) {
     }
   };
 
-  // Comptages par type
   const counts = useMemo(() => {
     const c = { human_detection: 0, motion_detection: 0, human_infrared: 0, low_voltage: 0, unknown: 0 };
     alerts.forEach((a) => { const t = getAlertType(a); c[t] = (c[t] || 0) + 1; });
     return c;
   }, [alerts]);
 
-  // Alertes filtrées
   const filtered = useMemo(() => {
     if (filter === "all") return alerts;
     return alerts.filter((a) => getAlertType(a) === filter);
   }, [alerts, filter]);
 
-  // Types présents
   const presentTypes = useMemo(() => {
     return Object.entries(counts).filter(([, v]) => v > 0).map(([k]) => k);
   }, [counts]);
 
-  // ── Pas de caméra sélectionnée ────────────────────────────────────────────
   if (!selectedSite || !selectedCamera) {
     return (
       <div className="flex h-full min-h-[60vh] items-center justify-center p-6">
@@ -234,8 +207,6 @@ export default function Alerts({ selectedCamera = null, selectedSite = null }) {
           </h1>
           <p className="mt-1 text-sm text-gray-500 font-mono">{deviceId}</p>
         </div>
-
-        {/* Bouton refresh */}
         <button
           onClick={loadAlerts}
           disabled={loading}
@@ -251,7 +222,6 @@ export default function Alerts({ selectedCamera = null, selectedSite = null }) {
 
       {/* Stats cards */}
       <div className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-3">
-        {/* Total */}
         <div className="relative overflow-hidden rounded-xl border border-gray-800 bg-gray-900 p-5">
           <div className="absolute right-4 top-4 rounded-lg bg-gray-700/40 p-2">
             <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -264,7 +234,6 @@ export default function Alerts({ selectedCamera = null, selectedSite = null }) {
           <p className="mt-1 text-xs text-gray-600">Dernières 24h</p>
         </div>
 
-        {/* Humain */}
         <div className="relative overflow-hidden rounded-xl border border-cyan-500/20 bg-gray-900 p-5">
           <div className="absolute right-4 top-4 rounded-lg bg-cyan-500/10 p-2">
             <svg className="h-4 w-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -285,7 +254,6 @@ export default function Alerts({ selectedCamera = null, selectedSite = null }) {
           </div>
         </div>
 
-        {/* Mouvement */}
         <div className="relative overflow-hidden rounded-xl border border-amber-500/20 bg-gray-900 p-5">
           <div className="absolute right-4 top-4 rounded-lg bg-amber-500/10 p-2">
             <svg className="h-4 w-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -340,7 +308,7 @@ export default function Alerts({ selectedCamera = null, selectedSite = null }) {
         </div>
       )}
 
-      {/* États de chargement / erreur / vide */}
+      {/* États */}
       {loading && alerts.length === 0 && (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {[...Array(6)].map((_, i) => (
@@ -363,13 +331,11 @@ export default function Alerts({ selectedCamera = null, selectedSite = null }) {
 
       {!loading && !error && filtered.length === 0 && (
         <div className="rounded-2xl border border-gray-800 bg-gray-900 p-10 text-center text-gray-400">
-          {filter !== "all"
-            ? "Aucune alerte pour ce filtre."
-            : "Aucune alerte pour cette caméra."}
+          {filter !== "all" ? "Aucune alerte pour ce filtre." : "Aucune alerte pour cette caméra."}
         </div>
       )}
 
-      {/* Grille d'alertes */}
+      {/* Grille */}
       {filtered.length > 0 && (
         <>
           <div className="mb-3 flex items-center justify-between">
@@ -387,7 +353,6 @@ export default function Alerts({ selectedCamera = null, selectedSite = null }) {
               </p>
             )}
           </div>
-
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             {filtered.map((alert) => (
               <AlertCard key={alert.alarmId} alert={alert} />
