@@ -59,9 +59,10 @@ export default function ImouPlayer({ camera, onError }) {
           deviceId: camera.deviceId,
           channelId: camera.channelId ?? 0,
           token: tokenData.kitToken,
-          type: 2,
+          type: 1,
           streamId: 0,
           bSupportMultithread: false,
+          encryptPwd: "",
         });
       } catch (err) {
         console.error("Erreur initialisation ImouPlayer :", err);
