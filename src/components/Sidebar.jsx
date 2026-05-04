@@ -46,7 +46,6 @@ const IconChevron = ({ open }) => (
   </svg>
 );
 
-// Bouton toggle sidebar
 const IconSidebarCollapse = ({ collapsed }) => (
   <svg className={`h-4 w-4 transition-transform duration-300 ${collapsed ? "rotate-180" : ""}`}
     fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -97,7 +96,6 @@ export default function Sidebar({
     setSelectedSite(siteId);
     setSelectedCamera(camera);
     setCurrentPage("cameraView");
-    // Si sidebar repliée, on la laisse repliée
   };
 
   const handleAlertCameraClick = (camera, siteId) => {
@@ -118,7 +116,7 @@ export default function Sidebar({
     <aside
       className={`sidebar-el fixed left-0 top-0 z-30 flex h-screen flex-col border-r border-gray-800 bg-gray-950 transition-all duration-300 ease-in-out ${sidebarWidth}`}
     >
-      {/* Header : logo + toggle */}
+      {/* Header */}
       <div className="flex items-center justify-between border-b border-gray-800 px-3 py-4">
         {!collapsed && (
           <div className="flex flex-1 items-center justify-center overflow-hidden">
@@ -139,11 +137,14 @@ export default function Sidebar({
         {/* Navigation principale */}
         <nav className={`mb-5 space-y-1 ${collapsed ? "px-2" : "px-3"}`}>
           {navItems.map(({ id, label, Icon }) => {
-            const isActive = currentPage === id;
+            const isActive = currentPage === id && (id !== "dashboard" || !selectedSite);
             return (
               <button
                 key={id}
-                onClick={() => setCurrentPage(id)}
+                onClick={() => {
+                  setCurrentPage(id);
+                  if (id === "dashboard") setSelectedSite(null);
+                }}
                 title={collapsed ? label : undefined}
                 className={`flex w-full items-center rounded-xl transition
                   ${collapsed ? "justify-center px-0 py-2.5" : "gap-3 px-3 py-2.5"}
@@ -167,10 +168,9 @@ export default function Sidebar({
           })}
         </nav>
 
-        {/* Mode réduit : juste des icônes de sites */}
+        {/* Mode réduit */}
         {collapsed ? (
           <div className="px-2 space-y-1">
-            {/* Séparateur */}
             <div className="my-2 border-t border-gray-800" />
             {sites.map((site) => {
               const onlineCount = site.cameras.filter((c) => c.status === "online").length;
@@ -193,7 +193,7 @@ export default function Sidebar({
           </div>
         ) : (
           <>
-            {/* Séparateur Sites */}
+            {/* Sites */}
             <div className="mb-2 flex items-center gap-2 px-4">
               <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-600">Sites</span>
               <div className="flex-1 border-t border-gray-800" />
@@ -257,7 +257,7 @@ export default function Sidebar({
               })}
             </div>
 
-            {/* Séparateur Alertes */}
+            {/* Alertes */}
             <div className="mb-2 flex items-center gap-2 px-4">
               <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-600">Alertes</span>
               <div className="flex-1 border-t border-gray-800" />

@@ -251,6 +251,7 @@ function App() {
                 <Dashboard
                   sites={sites}
                   selectedSite={selectedSite}
+                  setSelectedSite={setSelectedSite} 
                   selectedCamera={selectedCamera}
                   setSelectedCamera={setSelectedCamera}
                   setCurrentPage={setCurrentPage}

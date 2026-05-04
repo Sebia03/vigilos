@@ -1,22 +1,22 @@
 import { useEffect, useMemo, useState } from "react";
 import { fetchAlerts } from "../services/ImouService";
+import ImouPlayer from "../components/ImouPlayer";
 
 const BASE_URL = "http://127.0.0.1:5000";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const TYPE_CONFIG = {
-  human_detection:  { label: "Détection humaine",    color: "text-cyan-400",    bg: "bg-cyan-500/10",    border: "border-cyan-500/20",    dot: "bg-cyan-400",    iconBg: "bg-cyan-500/15" },
-  motion_detection: { label: "Mouvement détecté",    color: "text-amber-400",   bg: "bg-amber-500/10",   border: "border-amber-500/20",   dot: "bg-amber-400",   iconBg: "bg-amber-500/15" },
-  human_infrared:   { label: "Infrarouge humain",    color: "text-purple-400",  bg: "bg-purple-500/10",  border: "border-purple-500/20",  dot: "bg-purple-400",  iconBg: "bg-purple-500/15" },
-  low_voltage:      { label: "Batterie faible",       color: "text-red-400",     bg: "bg-red-500/10",     border: "border-red-500/20",     dot: "bg-red-400",     iconBg: "bg-red-500/15" },
-  unknown:          { label: "Alerte",                color: "text-gray-400",    bg: "bg-gray-500/10",    border: "border-gray-700",        dot: "bg-gray-400",    iconBg: "bg-gray-700/40" },
+  human_detection:  { label: "Détection humaine",  color: "text-cyan-400",   bg: "bg-cyan-500/10",   border: "border-cyan-500/20",   dot: "bg-cyan-400",   iconBg: "bg-cyan-500/15" },
+  motion_detection: { label: "Mouvement détecté",  color: "text-amber-400",  bg: "bg-amber-500/10",  border: "border-amber-500/20",  dot: "bg-amber-400",  iconBg: "bg-amber-500/15" },
+  human_infrared:   { label: "Infrarouge humain",  color: "text-purple-400", bg: "bg-purple-500/10", border: "border-purple-500/20", dot: "bg-purple-400", iconBg: "bg-purple-500/15" },
+  low_voltage:      { label: "Batterie faible",    color: "text-red-400",    bg: "bg-red-500/10",    border: "border-red-500/20",    dot: "bg-red-400",    iconBg: "bg-red-500/15" },
+  unknown:          { label: "Alerte",             color: "text-gray-400",   bg: "bg-gray-500/10",   border: "border-gray-700",       dot: "bg-gray-400",   iconBg: "bg-gray-700/40" },
 };
 
 function getAlertType(alert) {
   const msgType   = alert.raw?.msgType   || alert.msgType;
   const labelType = alert.raw?.labelType || alert.labelType;
   const typeLabel = alert.typeLabel;
-
   if (msgType === "human"       || labelType === "humanAlarm"  || typeLabel === "human_detection")  return "human_detection";
   if (msgType === "videoMotion" || labelType === "motionAlarm" || typeLabel === "motion_detection") return "motion_detection";
   if (typeLabel === "human_infrared")    return "human_infrared";
@@ -42,7 +42,23 @@ function formatTime(dateStr) {
   return d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 }
 
-// ─── Icônes par type d'alerte ─────────────────────────────────────────────────
+// Calcule beginTime / endTime autour de l'heure de l'alerte (±60s)
+function getPlaybackTimes(dateStr) {
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
+  if (isNaN(d)) return null;
+
+  const pad = (n) => String(n).padStart(2, "0");
+  const fmt = (date) => {
+    return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+  };
+
+  const begin = new Date(d.getTime() - 60 * 1000);
+  const end   = new Date(d.getTime() + 60 * 1000);
+  return { beginTime: fmt(begin), endTime: fmt(end) };
+}
+
+// ─── Icônes ───────────────────────────────────────────────────────────────────
 function AlertIcon({ type, colorClass }) {
   if (type === "human_detection" || type === "human_infrared") {
     return (
@@ -76,25 +92,117 @@ function AlertIcon({ type, colorClass }) {
   );
 }
 
+// ─── Modale Playback ──────────────────────────────────────────────────────────
+function PlaybackModal({ alert, camera, onClose }) {
+  const cfg         = getAlertConfig(alert);
+  const type        = getAlertType(alert);
+  const dateStr     = alert.raw?.localDate || alert.localDate || null;
+  const playbackTime = getPlaybackTimes(dateStr);
+
+  useEffect(() => {
+    const handler = (e) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="w-full max-w-3xl rounded-2xl border border-gray-800 bg-gray-950 overflow-hidden shadow-2xl">
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-gray-800 px-5 py-4">
+          <div className="flex items-center gap-3">
+            <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${cfg.iconBg}`}>
+              <AlertIcon type={type} colorClass={cfg.color} />
+            </div>
+            <div>
+              <p className={`text-sm font-semibold ${cfg.color}`}>{cfg.label}</p>
+              {dateStr && (
+                <p className="text-xs text-gray-500">
+                  {formatDate(dateStr)} · {formatTime(dateStr)}
+                </p>
+              )}
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="rounded-lg border border-gray-700 bg-gray-900 px-3 py-1.5 text-xs text-gray-400 transition hover:bg-gray-800"
+          >
+            ESC / Fermer
+          </button>
+        </div>
+
+        {/* Player */}
+        <div className="aspect-video w-full bg-black">
+          {playbackTime && camera ? (
+            <ImouPlayer
+              camera={camera}
+              playbackTime={playbackTime}
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-sm text-gray-500">
+              Impossible de lancer le playback — date d'alerte manquante
+            </div>
+          )}
+        </div>
+
+        {/* Info playback */}
+        {playbackTime && (
+          <div className="flex items-center justify-between border-t border-gray-800 px-5 py-3">
+            <p className="text-xs text-gray-600 font-mono">
+              {playbackTime.beginTime} → {playbackTime.endTime}
+            </p>
+            <p className="text-xs text-gray-600">
+              Caméra : {camera?.name || alert.raw?.name || "—"}
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Alert Card ───────────────────────────────────────────────────────────────
-function AlertCard({ alert }) {
+function AlertCard({ alert, camera, onPlay }) {
   const cfg     = getAlertConfig(alert);
   const type    = getAlertType(alert);
   const dateStr = alert.raw?.localDate || alert.localDate || null;
 
   return (
-    <div className={`overflow-hidden rounded-xl border bg-gray-900 transition hover:scale-[1.01] hover:shadow-lg hover:shadow-black/30 ${cfg.border}`}>
+    <div
+      onClick={() => onPlay(alert)}
+      className={`cursor-pointer overflow-hidden rounded-xl border bg-gray-900 transition hover:scale-[1.01] hover:shadow-lg hover:shadow-black/30 ${cfg.border}`}
+    >
       {/* Zone visuelle */}
       <div className={`relative flex h-44 w-full items-center justify-center ${cfg.iconBg}`}>
-        {/* Cercles décoratifs */}
         <div className={`absolute h-32 w-32 rounded-full opacity-20 ${cfg.bg}`} />
         <div className={`absolute h-20 w-20 rounded-full opacity-30 ${cfg.bg}`} />
-        {/* Icône */}
         <AlertIcon type={type} colorClass={cfg.color} />
+
         {/* Badge type */}
         <div className={`absolute left-2 top-2 flex items-center gap-1.5 rounded-full border px-2.5 py-1 ${cfg.bg} ${cfg.border}`}>
           <span className={`h-1.5 w-1.5 rounded-full ${cfg.dot}`} />
           <span className={`text-[11px] font-medium ${cfg.color}`}>{cfg.label}</span>
+        </div>
+
+        {/* Bouton play */}
+        <div className="absolute right-2 top-2 flex items-center gap-1.5 rounded-lg border border-white/10 bg-black/60 px-2.5 py-1.5 text-xs font-medium text-white opacity-0 transition group-hover:opacity-100">
+          <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M8 5v14l11-7z"/>
+          </svg>
+          Rejouer
+        </div>
+
+        {/* Overlay hover */}
+        <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition hover:bg-black/30">
+          <div className="flex items-center gap-2 rounded-xl border border-white/20 bg-black/60 px-4 py-2 opacity-0 transition hover:opacity-100">
+            <svg className="h-4 w-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M8 5v14l11-7z"/>
+            </svg>
+            <span className="text-sm font-medium text-white">Voir la vidéo</span>
+          </div>
         </div>
       </div>
 
@@ -124,10 +232,11 @@ function AlertCard({ alert }) {
 
 // ─── Alerts Page ──────────────────────────────────────────────────────────────
 export default function Alerts({ selectedCamera = null, selectedSite = null }) {
-  const [alerts, setAlerts]   = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState(null);
-  const [filter, setFilter]   = useState("all");
+  const [alerts, setAlerts]         = useState([]);
+  const [loading, setLoading]       = useState(false);
+  const [error, setError]           = useState(null);
+  const [filter, setFilter]         = useState("all");
+  const [playbackAlert, setPlaybackAlert] = useState(null);
 
   const deviceId   = selectedCamera?.deviceId || selectedCamera?.id;
   const cameraName = selectedCamera?.name || "Caméra";
@@ -145,6 +254,7 @@ export default function Alerts({ selectedCamera = null, selectedSite = null }) {
     try {
       setLoading(true);
       setError(null);
+      const { fetchAlerts } = await import("../services/ImouService");
       const data = await fetchAlerts(deviceId, channelId);
       const raw  = data?.success ? data.alarms || [] : [];
       const sorted = [...raw].sort((a, b) => {
@@ -154,7 +264,6 @@ export default function Alerts({ selectedCamera = null, selectedSite = null }) {
       });
       setAlerts(sorted);
     } catch (err) {
-      console.error("Erreur chargement alertes:", err);
       setError("Impossible de charger les alertes");
       setAlerts([]);
     } finally {
@@ -197,6 +306,15 @@ export default function Alerts({ selectedCamera = null, selectedSite = null }) {
   return (
     <div className="animate-fadeIn p-6">
 
+      {/* Modale playback */}
+      {playbackAlert && (
+        <PlaybackModal
+          alert={playbackAlert}
+          camera={selectedCamera}
+          onClose={() => setPlaybackAlert(null)}
+        />
+      )}
+
       {/* Header */}
       <div className="mb-6 flex items-start justify-between">
         <div>
@@ -220,7 +338,7 @@ export default function Alerts({ selectedCamera = null, selectedSite = null }) {
         </button>
       </div>
 
-      {/* Stats cards */}
+      {/* Stats */}
       <div className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-3">
         <div className="relative overflow-hidden rounded-xl border border-gray-800 bg-gray-900 p-5">
           <div className="absolute right-4 top-4 rounded-lg bg-gray-700/40 p-2">
@@ -278,28 +396,17 @@ export default function Alerts({ selectedCamera = null, selectedSite = null }) {
       {/* Filtres */}
       {presentTypes.length > 1 && (
         <div className="mb-5 flex flex-wrap items-center gap-2">
-          <button
-            onClick={() => setFilter("all")}
-            className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
-              filter === "all"
-                ? "bg-gray-700 text-white"
-                : "text-gray-500 hover:bg-gray-800 hover:text-gray-300"
-            }`}
-          >
+          <button onClick={() => setFilter("all")}
+            className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${filter === "all" ? "bg-gray-700 text-white" : "text-gray-500 hover:bg-gray-800 hover:text-gray-300"}`}>
             Tous ({alerts.length})
           </button>
           {presentTypes.map((type) => {
             const cfg = TYPE_CONFIG[type] || TYPE_CONFIG.unknown;
             return (
-              <button
-                key={type}
-                onClick={() => setFilter(filter === type ? "all" : type)}
+              <button key={type} onClick={() => setFilter(filter === type ? "all" : type)}
                 className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
-                  filter === type
-                    ? `${cfg.bg} ${cfg.border} ${cfg.color}`
-                    : "border-transparent text-gray-500 hover:bg-gray-800 hover:text-gray-300"
-                }`}
-              >
+                  filter === type ? `${cfg.bg} ${cfg.border} ${cfg.color}` : "border-transparent text-gray-500 hover:bg-gray-800 hover:text-gray-300"
+                }`}>
                 <span className={`h-1.5 w-1.5 rounded-full ${cfg.dot}`} />
                 {cfg.label} ({counts[type]})
               </button>
@@ -324,9 +431,7 @@ export default function Alerts({ selectedCamera = null, selectedSite = null }) {
       )}
 
       {error && (
-        <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-400">
-          {error}
-        </div>
+        <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-400">{error}</div>
       )}
 
       {!loading && !error && filtered.length === 0 && (
@@ -342,6 +447,7 @@ export default function Alerts({ selectedCamera = null, selectedSite = null }) {
             <p className="text-xs text-gray-600">
               {filtered.length} alerte{filtered.length > 1 ? "s" : ""}
               {filter !== "all" && ` · filtre : ${TYPE_CONFIG[filter]?.label}`}
+              <span className="ml-2 text-gray-700">· Cliquer sur une alerte pour voir la vidéo</span>
             </p>
             {loading && (
               <p className="flex items-center gap-1.5 text-xs text-gray-600">
@@ -355,7 +461,12 @@ export default function Alerts({ selectedCamera = null, selectedSite = null }) {
           </div>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             {filtered.map((alert) => (
-              <AlertCard key={alert.alarmId} alert={alert} />
+              <AlertCard
+                key={alert.alarmId}
+                alert={alert}
+                camera={selectedCamera}
+                onPlay={setPlaybackAlert}
+              />
             ))}
           </div>
         </>

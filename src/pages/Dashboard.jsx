@@ -3,7 +3,7 @@ import ImouPlayer from "../components/ImouPlayer";
 import { fetchAlerts } from "../services/ImouService";
 
 const BASE_URL = "http://127.0.0.1:5000";
-const MAX_LIVE_SLOTS = 2;
+const MAX_LIVE_SLOTS = 4;
 
 function proxyImageUrl(url) {
   if (!url) return null;
@@ -52,7 +52,7 @@ function CameraFullscreen({ camera, onClose }) {
 }
 
 // ─── Camera Card ──────────────────────────────────────────────────────────────
-function CameraCard({ camera, isSelected, onCardClick, liveSlots, setLiveSlots, snapshot }) {
+function CameraCard({ camera, isSelected, onCardClick, liveSlots, setLiveSlots, snapshot, autoPlay }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [fsOpen, setFsOpen]       = useState(false);
   const [waking, setWaking]       = useState(false);
@@ -60,10 +60,20 @@ function CameraCard({ camera, isSelected, onCardClick, liveSlots, setLiveSlots, 
   const isOnline = camera.status === "online";
   const isSleep  = camera.status === "sleep";
   const isOff    = !isOnline && !isSleep;
-
   const canAttemptPlay = isOnline || isSleep;
 
-  // Si ce player était actif mais on a été évincé (slots pleins), on s'arrête
+  // Lancement automatique si autoPlay
+  useEffect(() => {
+    if (autoPlay && isOnline && !isPlaying) {
+      setLiveSlots((prev) => {
+        if (prev.includes(camera.id) || prev.length >= MAX_LIVE_SLOTS) return prev;
+        return [...prev, camera.id];
+      });
+      setIsPlaying(true);
+    }
+  }, [autoPlay]);
+
+  // Éviction si slots pleins
   useEffect(() => {
     if (isPlaying && !liveSlots.includes(camera.id)) {
       setIsPlaying(false);
@@ -75,14 +85,12 @@ function CameraCard({ camera, isSelected, onCardClick, liveSlots, setLiveSlots, 
     if (!canAttemptPlay) return;
 
     if (isPlaying) {
-      // Stopper ce player
       setIsPlaying(false);
       setLiveSlots((prev) => prev.filter((id) => id !== camera.id));
       return;
     }
 
     if (liveSlots.length >= MAX_LIVE_SLOTS) {
-      // Évincer le premier slot (le plus ancien)
       const evicted = liveSlots[0];
       setLiveSlots((prev) => [...prev.slice(1), camera.id]);
     } else {
@@ -93,14 +101,10 @@ function CameraCard({ camera, isSelected, onCardClick, liveSlots, setLiveSlots, 
     setIsPlaying(true);
   };
 
-  const handlePlayerError = () => {
-    setWaking(false);
-  };
-
   const getStatusBadge = () => {
     if (isOnline) return <span className="shrink-0 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-400">EN LIGNE</span>;
-    if (isSleep)  return <span className="shrink-0 rounded-full border border-amber-500/20  bg-amber-500/10  px-3 py-1 text-xs font-medium text-amber-400">VEILLE</span>;
-    return               <span className="shrink-0 rounded-full border border-red-500/20    bg-red-500/10    px-3 py-1 text-xs font-medium text-red-400">HORS LIGNE</span>;
+    if (isSleep)  return <span className="shrink-0 rounded-full border border-amber-500/20 bg-amber-500/10 px-3 py-1 text-xs font-medium text-amber-400">VEILLE</span>;
+    return               <span className="shrink-0 rounded-full border border-red-500/20 bg-red-500/10 px-3 py-1 text-xs font-medium text-red-400">HORS LIGNE</span>;
   };
 
   return (
@@ -114,7 +118,6 @@ function CameraCard({ camera, isSelected, onCardClick, liveSlots, setLiveSlots, 
           ${isOff ? "opacity-60" : "cursor-pointer hover:scale-[1.01]"}
           ${isSelected ? "border-cyan-500/40 ring-1 ring-cyan-500/20" : "border-gray-800 hover:border-cyan-500/30"}`}
       >
-        {/* Header */}
         <div className="flex items-start justify-between gap-3 p-2 pb-1">
           <div className="min-w-0">
             <h3 className="truncate text-base font-semibold text-white">{camera.name}</h3>
@@ -123,17 +126,13 @@ function CameraCard({ camera, isSelected, onCardClick, liveSlots, setLiveSlots, 
           {getStatusBadge()}
         </div>
 
-        {/* Preview zone */}
         <div className="relative mx-2 mb-2 overflow-hidden rounded-xl bg-black" style={{ height: "176px" }}>
-
-          {/* Player IMOU — actif seulement si isPlaying */}
           {isPlaying && (
             <div className="imou-player-card absolute inset-0">
-              <ImouPlayer camera={camera} onError={handlePlayerError} />
+              <ImouPlayer camera={camera} onError={() => setWaking(false)} />
             </div>
           )}
 
-          {/* Thumbnail snapshot (caméras sleep/offline) */}
           {!isPlaying && snapshot?.thumbUrl && (
             <>
               <img
@@ -153,18 +152,15 @@ function CameraCard({ camera, isSelected, onCardClick, liveSlots, setLiveSlots, 
             </>
           )}
 
-          {/* Placeholder si pas de snapshot et pas en lecture */}
           {!isPlaying && !snapshot?.thumbUrl && (
             <div className="flex h-full w-full items-center justify-center">
-              {isOff ? (
-                <p className="text-sm text-gray-600">Hors ligne</p>
-              ) : (
-                <p className="text-sm text-gray-600">{isSleep ? "En veille" : "Cliquer pour lancer"}</p>
-              )}
+              {isOff
+                ? <p className="text-sm text-gray-600">Hors ligne</p>
+                : <p className="text-sm text-gray-600">{isSleep ? "En veille" : "Cliquer ▶ pour lancer"}</p>
+              }
             </div>
           )}
 
-          {/* Bouton Play/Stop — visible au survol ou quand en lecture */}
           {canAttemptPlay && (
             <button
               onClick={handlePlay}
@@ -175,24 +171,13 @@ function CameraCard({ camera, isSelected, onCardClick, liveSlots, setLiveSlots, 
                 }`}
             >
               {isPlaying ? (
-                <>
-                  <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
-                  </svg>
-                  Stop
-                </>
+                <><svg className="h-3 w-3" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>Stop</>
               ) : (
-                <>
-                  <svg className="h-3 w-3" style={{ transform: "translateX(1px)" }} fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M8 5v14l11-7z"/>
-                  </svg>
-                  {isSleep ? "Réveiller" : "Live"}
-                </>
+                <><svg className="h-3 w-3" style={{ transform: "translateX(1px)" }} fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>{isSleep ? "Réveiller" : "Live"}</>
               )}
             </button>
           )}
 
-          {/* Indicateur "réveil en cours" */}
           {waking && isPlaying && (
             <div className="absolute bottom-2 right-2 flex items-center gap-1.5 rounded bg-amber-500/20 px-2 py-0.5">
               <svg className="h-3 w-3 animate-spin text-amber-400" fill="none" viewBox="0 0 24 24">
@@ -203,17 +188,82 @@ function CameraCard({ camera, isSelected, onCardClick, liveSlots, setLiveSlots, 
             </div>
           )}
 
-          {/* Hint double-clic fullscreen */}
           {isPlaying && (
             <div className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity group-hover:opacity-100 pointer-events-none">
-              <span className="rounded bg-black/50 px-2 py-1 font-mono text-xs text-cyan-400/80">
-                ⤢ double-clic
-              </span>
+              <span className="rounded bg-black/50 px-2 py-1 font-mono text-xs text-cyan-400/80">⤢ double-clic</span>
             </div>
           )}
         </div>
       </div>
     </>
+  );
+}
+
+// ─── Site Card ────────────────────────────────────────────────────────────────
+function SiteCard({ site, onClick }) {
+  const online  = site.cameras.filter((c) => c.status === "online").length;
+  const sleep   = site.cameras.filter((c) => c.status === "sleep").length;
+  const offline = site.cameras.filter((c) => c.status === "offline").length;
+  const total   = site.cameras.length;
+  const healthPct = total > 0 ? Math.round((online / total) * 100) : 0;
+
+  const healthColor = healthPct >= 70 ? "bg-emerald-500" : healthPct >= 40 ? "bg-amber-500" : "bg-red-500";
+  const borderColor = healthPct >= 70 ? "border-emerald-500/20 hover:border-emerald-500/40" : healthPct >= 40 ? "border-amber-500/20 hover:border-amber-500/40" : "border-red-500/20 hover:border-red-500/40";
+
+  return (
+    <div
+      onClick={() => onClick(site)}
+      className={`cursor-pointer overflow-hidden rounded-xl border bg-gray-900 p-5 transition hover:scale-[1.01] hover:shadow-lg hover:shadow-black/30 ${borderColor}`}
+    >
+      {/* Header */}
+      <div className="mb-4 flex items-start justify-between">
+        <div>
+          <h3 className="text-lg font-bold text-white">{site.name}</h3>
+          <p className="text-sm text-gray-500">{total} caméra{total > 1 ? "s" : ""}</p>
+        </div>
+        <div className="flex items-center gap-1.5 rounded-full border border-gray-700 bg-gray-800 px-3 py-1">
+          <span className={`h-2 w-2 rounded-full ${online > 0 ? "bg-emerald-400 animate-pulse" : "bg-gray-600"}`} />
+          <span className="text-xs font-medium text-gray-300">{online} en ligne</span>
+        </div>
+      </div>
+
+      {/* Barre de santé */}
+      <div className="mb-4">
+        <div className="mb-1 flex items-center justify-between">
+          <span className="text-xs text-gray-500">Disponibilité</span>
+          <span className="text-xs font-medium text-gray-300">{healthPct}%</span>
+        </div>
+        <div className="h-2 overflow-hidden rounded-full bg-gray-800">
+          <div className={`h-full rounded-full transition-all ${healthColor}`} style={{ width: `${healthPct}%` }} />
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-3 gap-2">
+        <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/20 p-2 text-center">
+          <p className="text-lg font-bold text-emerald-400">{online}</p>
+          <p className="text-[10px] text-gray-500">En ligne</p>
+        </div>
+        <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 p-2 text-center">
+          <p className="text-lg font-bold text-amber-400">{sleep}</p>
+          <p className="text-[10px] text-gray-500">Veille</p>
+        </div>
+        <div className="rounded-lg bg-red-500/10 border border-red-500/20 p-2 text-center">
+          <p className="text-lg font-bold text-red-400">{offline}</p>
+          <p className="text-[10px] text-gray-500">Hors ligne</p>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="mt-4 flex items-center justify-end">
+        <span className="flex items-center gap-1 text-xs text-gray-500 hover:text-cyan-400 transition">
+          Voir les caméras
+          <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </span>
+      </div>
+    </div>
   );
 }
 
@@ -253,50 +303,58 @@ function useLastSnapshots(cameras) {
 }
 
 // ─── Dashboard ────────────────────────────────────────────────────────────────
-export default function Dashboard({ sites, selectedSite, selectedCamera, setSelectedCamera, setCurrentPage }) {
+export default function Dashboard({ sites, selectedSite, setSelectedSite, selectedCamera, setSelectedCamera, setCurrentPage }) {
   const allCameras  = sites.flatMap((s) => s.cameras);
   const currentSite = selectedSite ? sites.find((s) => s.id === selectedSite) || null : null;
-  const visibleCameras = currentSite ? currentSite.cameras : allCameras;
+  const visibleCameras = currentSite ? currentSite.cameras : [];
 
-  const sorted = [
+  const sorted = currentSite ? [
     ...visibleCameras.filter((c) => c.status === "online"),
     ...visibleCameras.filter((c) => c.status === "sleep"),
     ...visibleCameras.filter((c) => c.status === "offline"),
-  ];
+  ] : [];
 
-  const total   = visibleCameras.length;
-  const online  = visibleCameras.filter((c) => c.status === "online").length;
-  const sleep   = visibleCameras.filter((c) => c.status === "sleep").length;
-  const offline = visibleCameras.filter((c) => c.status === "offline").length;
-  const activeSites = selectedSite
-    ? (currentSite?.cameras.length > 0 ? 1 : 0)
-    : sites.filter((s) => s.cameras.length > 0).length;
+  const total   = allCameras.length;
+  const online  = allCameras.filter((c) => c.status === "online").length;
+  const sleep   = allCameras.filter((c) => c.status === "sleep").length;
+  const offline = allCameras.filter((c) => c.status === "offline").length;
 
-  // Slots live partagés entre toutes les cards
   const [liveSlots, setLiveSlots] = useState([]);
 
+  // Reset slots quand on change de site
+  useEffect(() => {
+    setLiveSlots([]);
+  }, [selectedSite]);
+
   const snapshots = useLastSnapshots(visibleCameras);
+
+  // Les 4 premières caméras online ont l'autoPlay
+  const onlineCameraIds = sorted.filter((c) => c.status === "online").slice(0, MAX_LIVE_SLOTS).map((c) => c.id);
 
   const handleCardClick = (camera) => {
     setSelectedCamera(camera);
     setCurrentPage("cameraView");
   };
 
+  const handleSiteClick = (site) => {
+    setSelectedSite(site.id);
+  };
+
   return (
     <div className="animate-fadeIn p-6">
-      {/* Title */}
+
+      {/* Stats globales */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-white">
-          {currentSite ? currentSite.name : "Vue d'ensemble"}
+          {currentSite ? currentSite.name : "Centre de supervision"}
         </h1>
         <p className="mt-1 text-sm text-gray-400">
           {currentSite
-            ? `Supervision du site ${currentSite.name}`
-            : "Supervision des sites et aperçu rapide des caméras"}
+            ? `${visibleCameras.length} caméra${visibleCameras.length > 1 ? "s" : ""} · ${visibleCameras.filter(c => c.status === "online").length} en ligne`
+            : `${sites.length} sites · ${total} caméras au total`}
         </p>
       </div>
 
-      {/* Stats */}
       <div className="mb-8 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
         <div className="relative overflow-hidden rounded-xl border border-gray-800 bg-gray-900 p-5">
           <div className="absolute right-4 top-4 rounded-lg bg-gray-700/40 p-2">
@@ -319,8 +377,7 @@ export default function Dashboard({ sites, selectedSite, selectedCamera, setSele
           <h3 className="mt-2 text-4xl font-bold text-emerald-400">{online}</h3>
           <div className="mt-1 flex items-center gap-1.5">
             <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-gray-800">
-              <div className="h-full rounded-full bg-emerald-500 transition-all"
-                style={{ width: total > 0 ? `${(online / total) * 100}%` : "0%" }} />
+              <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: total > 0 ? `${(online / total) * 100}%` : "0%" }} />
             </div>
             <span className="text-xs text-gray-600">{total > 0 ? Math.round((online / total) * 100) : 0}%</span>
           </div>
@@ -336,8 +393,7 @@ export default function Dashboard({ sites, selectedSite, selectedCamera, setSele
           <h3 className="mt-2 text-4xl font-bold text-red-400">{offline}</h3>
           <div className="mt-1 flex items-center gap-1.5">
             <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-gray-800">
-              <div className="h-full rounded-full bg-red-500 transition-all"
-                style={{ width: total > 0 ? `${(offline / total) * 100}%` : "0%" }} />
+              <div className="h-full rounded-full bg-red-500 transition-all" style={{ width: total > 0 ? `${(offline / total) * 100}%` : "0%" }} />
             </div>
             <span className="text-xs text-gray-600">{total > 0 ? Math.round((offline / total) * 100) : 0}%</span>
           </div>
@@ -350,56 +406,84 @@ export default function Dashboard({ sites, selectedSite, selectedCamera, setSele
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
             </svg>
           </div>
-          <p className="text-xs font-medium uppercase tracking-widest text-gray-500">
-            {selectedSite ? "Site affiché" : "Sites actifs"}
-          </p>
-          <h3 className="mt-2 text-4xl font-bold text-amber-400">{activeSites}</h3>
-          {sleep > 0 && <p className="mt-1 text-xs text-amber-500/70">{sleep} en veille</p>}
+          <p className="text-xs font-medium uppercase tracking-widest text-gray-500">En veille</p>
+          <h3 className="mt-2 text-4xl font-bold text-amber-400">{sleep}</h3>
+          <p className="mt-1 text-xs text-gray-600">{sites.length} site{sites.length > 1 ? "s" : ""} actifs</p>
         </div>
       </div>
 
-      {/* Section header */}
-      <div className="mb-4 flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-semibold text-white">
-            {currentSite ? `Caméras - ${currentSite.name}` : "Aperçu des caméras"}
-          </h2>
-          <p className="mt-1 text-sm text-gray-400">
-            {sleep > 0 && `${sleep} en veille · `}
-            {liveSlots.length > 0
-              ? `${liveSlots.length}/${MAX_LIVE_SLOTS} flux live actif${liveSlots.length > 1 ? "s" : ""}`
-              : "Cliquer ▶ pour lancer un flux"}
-          </p>
-        </div>
-        {liveSlots.length > 0 && (
-          <button
-            onClick={() => setLiveSlots([])}
-            className="rounded-lg border border-gray-700 bg-gray-900 px-3 py-1.5 text-xs text-gray-400 transition hover:bg-gray-800 hover:text-gray-200"
-          >
-            Tout arrêter
-          </button>
-        )}
-      </div>
+      {/* Vue sites (pas de site sélectionné) */}
+      {!currentSite && (
+        <>
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-semibold text-white">Sites de surveillance</h2>
+              <p className="mt-1 text-sm text-gray-400">Sélectionnez un site pour voir ses caméras</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-2">
+            {sites.map((site) => (
+              <SiteCard key={site.id} site={site} onClick={handleSiteClick} />
+            ))}
+          </div>
+        </>
+      )}
 
-      {/* Grid */}
-      {sorted.length === 0 ? (
-        <div className="rounded-2xl border border-gray-800 bg-gray-900 p-10 text-center text-gray-400">
-          Aucune caméra disponible pour ce site.
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {sorted.map((camera) => (
-            <CameraCard
-              key={camera.id}
-              camera={camera}
-              isSelected={selectedCamera?.id === camera.id}
-              onCardClick={handleCardClick}
-              liveSlots={liveSlots}
-              setLiveSlots={setLiveSlots}
-              snapshot={snapshots[camera.deviceId] || null}
-            />
-          ))}
-        </div>
+      {/* Vue caméras d'un site */}
+      {currentSite && (
+        <>
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setSelectedSite(null)}
+                  className="flex items-center gap-1 text-sm text-gray-500 hover:text-cyan-400 transition"
+                >
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                  Tous les sites
+                </button>
+                <span className="text-gray-700">/</span>
+                <h2 className="text-xl font-semibold text-white">{currentSite.name}</h2>
+              </div>
+              <p className="mt-1 text-sm text-gray-400">
+                {liveSlots.length > 0
+                  ? `${liveSlots.length}/${MAX_LIVE_SLOTS} flux live actif${liveSlots.length > 1 ? "s" : ""}`
+                  : "Les caméras en ligne démarrent automatiquement"}
+              </p>
+            </div>
+            {liveSlots.length > 0 && (
+              <button
+                onClick={() => setLiveSlots([])}
+                className="rounded-lg border border-gray-700 bg-gray-900 px-3 py-1.5 text-xs text-gray-400 transition hover:bg-gray-800 hover:text-gray-200"
+              >
+                Tout arrêter
+              </button>
+            )}
+          </div>
+
+          {sorted.length === 0 ? (
+            <div className="rounded-2xl border border-gray-800 bg-gray-900 p-10 text-center text-gray-400">
+              Aucune caméra disponible pour ce site.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {sorted.map((camera) => (
+                <CameraCard
+                  key={camera.id}
+                  camera={camera}
+                  isSelected={selectedCamera?.id === camera.id}
+                  onCardClick={handleCardClick}
+                  liveSlots={liveSlots}
+                  setLiveSlots={setLiveSlots}
+                  snapshot={snapshots[camera.deviceId] || null}
+                  autoPlay={onlineCameraIds.includes(camera.id)}
+                />
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   );
