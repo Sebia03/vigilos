@@ -5,7 +5,7 @@ import axios from "axios";
 const BASE_URL = "http://127.0.0.1:5000";
 
 export default function Login({ onLoginSuccess }) {
-  const [username, setUsername] = useState("");
+  const [email, setEmail]     = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState("");
@@ -13,7 +13,7 @@ export default function Login({ onLoginSuccess }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!username || !password) {
+    if (!email || !password) {
       setError("Veuillez remplir tous les champs.");
       return;
     }
@@ -22,13 +22,14 @@ export default function Login({ onLoginSuccess }) {
       setLoading(true);
       setError("");
 
-      await axios.post(
+      const res = await axios.post(
         `${BASE_URL}/login`,
-        { username, password },
+        { email, password },
         { withCredentials: true }
       );
 
-      onLoginSuccess();
+      // Passer le profil utilisateur au parent
+      onLoginSuccess(res.data.user);
     } catch (err) {
       if (err.response?.status === 401) {
         setError("Identifiants incorrects.");
@@ -42,24 +43,18 @@ export default function Login({ onLoginSuccess }) {
 
   return (
     <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
-      {/* Background subtle grid */}
       <div className="absolute inset-0 opacity-[0.03]"
         style={{ backgroundImage: "repeating-linear-gradient(0deg, transparent, transparent 40px, #fff 40px, #fff 41px), repeating-linear-gradient(90deg, transparent, transparent 40px, #fff 40px, #fff 41px)" }} />
 
       <div className="relative w-full max-w-md">
-        {/* Card */}
         <div className="rounded-2xl border border-gray-800 bg-gray-900 shadow-2xl shadow-black/50 overflow-hidden">
 
           {/* Header */}
           <div className="bg-gray-950 border-b border-gray-800 px-8 py-8 flex flex-col items-center gap-4">
             <img src={logo} alt="SONACOS" className="h-16 w-auto object-contain" />
             <div className="text-center">
-              <h1 className="text-lg font-bold text-white tracking-wide">
-                Plateforme de Supervision
-              </h1>
-              <p className="text-xs text-gray-500 mt-0.5 font-mono tracking-widest uppercase">
-                VigilOS · Accès sécurisé
-              </p>
+              <h1 className="text-lg font-bold text-white tracking-wide">Plateforme de Supervision</h1>
+              <p className="text-xs text-gray-500 mt-0.5 font-mono tracking-widest uppercase">VigilOS · Accès sécurisé</p>
             </div>
           </div>
 
@@ -67,24 +62,24 @@ export default function Login({ onLoginSuccess }) {
           <div className="px-8 py-8">
             <form onSubmit={handleSubmit} className="space-y-5">
 
-              {/* Username */}
+              {/* Email */}
               <div className="space-y-1.5">
                 <label className="text-xs font-medium uppercase tracking-widest text-gray-500">
-                  Identifiant
+                  Adresse email
                 </label>
                 <div className="relative">
                   <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600">
                     <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-                        d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+                        d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
                     </svg>
                   </div>
                   <input
-                    type="text"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    placeholder="Nom d'utilisateur"
-                    autoComplete="username"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="votre@email.sn"
+                    autoComplete="email"
                     className="w-full rounded-xl border border-gray-700 bg-gray-800 pl-10 pr-4 py-3 text-sm text-gray-200 placeholder-gray-600 outline-none transition focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20"
                   />
                 </div>
@@ -110,11 +105,8 @@ export default function Login({ onLoginSuccess }) {
                     autoComplete="current-password"
                     className="w-full rounded-xl border border-gray-700 bg-gray-800 pl-10 pr-12 py-3 text-sm text-gray-200 placeholder-gray-600 outline-none transition focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20"
                   />
-                  <button
-                    type="button"
-                    onClick={() => setShowPwd(!showPwd)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-600 hover:text-gray-400 transition-colors"
-                  >
+                  <button type="button" onClick={() => setShowPwd(!showPwd)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-600 hover:text-gray-400 transition-colors">
                     {showPwd ? (
                       <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
@@ -143,11 +135,8 @@ export default function Login({ onLoginSuccess }) {
               )}
 
               {/* Submit */}
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full rounded-xl bg-cyan-500/20 border border-cyan-500/30 py-3 text-sm font-semibold text-cyan-400 transition hover:bg-cyan-500/30 hover:border-cyan-500/50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              >
+              <button type="submit" disabled={loading}
+                className="w-full rounded-xl bg-cyan-500/20 border border-cyan-500/30 py-3 text-sm font-semibold text-cyan-400 transition hover:bg-cyan-500/30 hover:border-cyan-500/50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
                 {loading ? (
                   <>
                     <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">

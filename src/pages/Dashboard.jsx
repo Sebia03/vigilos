@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import ImouPlayer from "../components/ImouPlayer";
 import { fetchAlerts } from "../services/ImouService";
 
-const BASE_URL = "http://127.0.0.1:5000";
+const BASE_URL = "http://localhost:5000";
 const MAX_LIVE_SLOTS = 4;
 
 function proxyImageUrl(url) {

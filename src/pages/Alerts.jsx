@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { fetchAlerts } from "../services/ImouService";
 import ImouPlayer from "../components/ImouPlayer";
 
-const BASE_URL = "http://127.0.0.1:5000";
+const BASE_URL = "http://localhost:5000";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const TYPE_CONFIG = {
@@ -43,7 +43,7 @@ function formatTime(dateStr) {
 }
 
 // Calcule beginTime / endTime autour de l'heure de l'alerte (±60s)
-function getPlaybackTimes(dateStr) {
+function getPlaybackTimes(dateStr, alertType) {
   if (!dateStr) return null;
   const d = new Date(dateStr);
   if (isNaN(d)) return null;
@@ -55,9 +55,12 @@ function getPlaybackTimes(dateStr) {
 
   const begin = new Date(d.getTime() - 60 * 1000);
   const end   = new Date(d.getTime() + 60 * 1000);
-  return { beginTime: fmt(begin), endTime: fmt(end) };
+  
+  // human_detection → cloud, motion_detection → device
+  const recordType = (alertType === "human_detection" || alertType === "human_infrared") ? "cloud" : "device";
+  
+  return { beginTime: fmt(begin), endTime: fmt(end), recordType };
 }
-
 // ─── Icônes ───────────────────────────────────────────────────────────────────
 function AlertIcon({ type, colorClass }) {
   if (type === "human_detection" || type === "human_infrared") {
