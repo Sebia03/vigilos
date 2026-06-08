@@ -9,6 +9,13 @@ const IconHome = () => (
   </svg>
 );
 
+const IconStats = () => (
+  <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+      d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
+  </svg>
+);
+
 const IconPlayback = () => (
   <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -74,6 +81,14 @@ function SiteStatusBar({ cameras }) {
   );
 }
 
+// ─── nav items ────────────────────────────────────────────────────────────────
+const navItems = [
+  { id: "dashboard",  label: "Accueil",      Icon: IconHome },
+  { id: "statistics", label: "Statistiques", Icon: IconStats },
+  { id: "playback",   label: "Playback",     Icon: IconPlayback },
+  { id: "alerts",     label: "Alertes",      Icon: IconAlerts },
+];
+
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
 export default function Sidebar({
   sites,
@@ -85,6 +100,7 @@ export default function Sidebar({
   setSelectedSite,
   collapsed,
   setCollapsed,
+  currentUser,
 }) {
   const [expandedSites, setExpandedSites]           = useState({ dakar: true });
   const [expandedAlertSites, setExpandedAlertSites] = useState({ dakar: true });
@@ -104,18 +120,11 @@ export default function Sidebar({
     setCurrentPage("alerts");
   };
 
-  const navItems = [
-    { id: "dashboard", label: "Accueil",  Icon: IconHome },
-    { id: "playback",  label: "Playback", Icon: IconPlayback },
-    { id: "alerts",    label: "Alertes",  Icon: IconAlerts },
-  ];
-
   const sidebarWidth = collapsed ? "w-16" : "w-64";
 
   return (
-    <aside
-      className={`sidebar-el fixed left-0 top-0 z-30 flex h-screen flex-col border-r border-gray-800 bg-gray-950 transition-all duration-300 ease-in-out ${sidebarWidth}`}
-    >
+    <aside className={`sidebar-el fixed left-0 top-0 z-30 flex h-screen flex-col border-r border-gray-800 bg-gray-950 transition-all duration-300 ease-in-out ${sidebarWidth}`}>
+
       {/* Header */}
       <div className="flex items-center justify-between border-b border-gray-800 px-3 py-4">
         {!collapsed && (
@@ -123,11 +132,9 @@ export default function Sidebar({
             <img src={logo} alt="SONACOS" className="h-12 w-auto object-contain" />
           </div>
         )}
-        <button
-          onClick={() => setCollapsed(!collapsed)}
+        <button onClick={() => setCollapsed(!collapsed)}
           className={`shrink-0 rounded-lg p-1.5 text-gray-500 transition hover:bg-gray-800 hover:text-gray-200 ${collapsed ? "mx-auto" : "ml-2"}`}
-          title={collapsed ? "Déplier la sidebar" : "Replier la sidebar"}
-        >
+          title={collapsed ? "Déplier la sidebar" : "Replier la sidebar"}>
           <IconSidebarCollapse collapsed={collapsed} />
         </button>
       </div>
@@ -139,8 +146,7 @@ export default function Sidebar({
           {navItems.map(({ id, label, Icon }) => {
             const isActive = currentPage === id && (id !== "dashboard" || !selectedSite);
             return (
-              <button
-                key={id}
+              <button key={id}
                 onClick={() => {
                   setCurrentPage(id);
                   if (id === "dashboard") setSelectedSite(null);
@@ -154,9 +160,7 @@ export default function Sidebar({
                     : "text-gray-400 hover:bg-gray-800/60 hover:text-gray-200"
                   }`}
               >
-                <span className={isActive ? "text-cyan-400" : "text-gray-500"}>
-                  <Icon />
-                </span>
+                <span className={isActive ? "text-cyan-400" : "text-gray-500"}><Icon /></span>
                 {!collapsed && (
                   <>
                     <span className="flex-1 text-left">{label}</span>
@@ -176,17 +180,13 @@ export default function Sidebar({
               const onlineCount = site.cameras.filter((c) => c.status === "online").length;
               const isActive = currentPage === "dashboard" && selectedSite === site.id;
               return (
-                <button
-                  key={site.id}
+                <button key={site.id}
                   onClick={() => { setSelectedSite(site.id); setCurrentPage("dashboard"); }}
                   title={site.name}
                   className={`relative flex w-full items-center justify-center rounded-xl py-2.5 transition
-                    ${isActive ? "border border-cyan-500/20 bg-cyan-500/10 text-cyan-400" : "text-gray-500 hover:bg-gray-800/60 hover:text-gray-300"}`}
-                >
+                    ${isActive ? "border border-cyan-500/20 bg-cyan-500/10 text-cyan-400" : "text-gray-500 hover:bg-gray-800/60 hover:text-gray-300"}`}>
                   <IconLocation />
-                  {onlineCount > 0 && (
-                    <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-emerald-400" />
-                  )}
+                  {onlineCount > 0 && <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-emerald-400" />}
                 </button>
               );
             })}
@@ -205,31 +205,20 @@ export default function Sidebar({
                 const isActive    = currentPage === "dashboard" && selectedSite === site.id;
                 const hasCameras  = Array.isArray(site.cameras) && site.cameras.length > 0;
                 const onlineCount = site.cameras.filter((c) => c.status === "online").length;
-
                 return (
                   <div key={site.id}>
-                    <button
-                      onClick={() => { toggleSite(site.id); setSelectedSite(site.id); setCurrentPage("dashboard"); }}
+                    <button onClick={() => { toggleSite(site.id); setSelectedSite(site.id); setCurrentPage("dashboard"); }}
                       className={`flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm transition
-                        ${isActive ? "border border-cyan-500/20 bg-cyan-500/10 text-cyan-400" : "text-gray-300 hover:bg-gray-800/60"}`}
-                    >
+                        ${isActive ? "border border-cyan-500/20 bg-cyan-500/10 text-cyan-400" : "text-gray-300 hover:bg-gray-800/60"}`}>
                       <span className={isActive ? "text-cyan-400" : "text-gray-500"}><IconLocation /></span>
                       <span className="flex-1 truncate text-left font-medium">{site.name}</span>
                       {onlineCount > 0 && (
-                        <span className="rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-medium text-emerald-400">
-                          {onlineCount}
-                        </span>
+                        <span className="rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-medium text-emerald-400">{onlineCount}</span>
                       )}
-                      <span className="rounded-full bg-gray-800 px-1.5 py-0.5 text-[10px] text-gray-500">
-                        {site.cameras.length}
-                      </span>
+                      <span className="rounded-full bg-gray-800 px-1.5 py-0.5 text-[10px] text-gray-500">{site.cameras.length}</span>
                       <IconChevron open={isExpanded} />
                     </button>
-
-                    {hasCameras && (
-                      <div className="px-3"><SiteStatusBar cameras={site.cameras} /></div>
-                    )}
-
+                    {hasCameras && <div className="px-3"><SiteStatusBar cameras={site.cameras} /></div>}
                     {isExpanded && hasCameras && (
                       <div className="mt-1 space-y-0.5 pl-3">
                         {site.cameras.map((camera) => {
@@ -238,8 +227,7 @@ export default function Sidebar({
                           return (
                             <button key={key} onClick={() => handleCameraClick(camera, site.id)}
                               className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs transition
-                                ${isSel ? "bg-gray-800 text-cyan-400" : "text-gray-500 hover:bg-gray-800/40 hover:text-gray-300"}`}
-                            >
+                                ${isSel ? "bg-gray-800 text-cyan-400" : "text-gray-500 hover:bg-gray-800/40 hover:text-gray-300"}`}>
                               <span className={isSel ? "text-cyan-400" : "text-gray-600"}><IconCamera /></span>
                               <span className="flex-1 truncate">{camera.name}</span>
                               <StatusDot status={camera.status} />
@@ -248,10 +236,7 @@ export default function Sidebar({
                         })}
                       </div>
                     )}
-
-                    {isExpanded && !hasCameras && (
-                      <p className="px-3 py-2 text-xs text-gray-600">Aucune caméra</p>
-                    )}
+                    {isExpanded && !hasCameras && <p className="px-3 py-2 text-xs text-gray-600">Aucune caméra</p>}
                   </div>
                 );
               })}
@@ -268,22 +253,16 @@ export default function Sidebar({
                 const isExpanded = expandedAlertSites[site.id] ?? false;
                 const isActive   = currentPage === "alerts" && selectedSite === site.id;
                 const hasCameras = Array.isArray(site.cameras) && site.cameras.length > 0;
-
                 return (
                   <div key={`alert-${site.id}`}>
-                    <button
-                      onClick={() => { toggleAlert(site.id); setSelectedSite(site.id); setCurrentPage("alerts"); }}
+                    <button onClick={() => { toggleAlert(site.id); setSelectedSite(site.id); setCurrentPage("alerts"); }}
                       className={`flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm transition
-                        ${isActive ? "border border-cyan-500/20 bg-cyan-500/10 text-cyan-400" : "text-gray-300 hover:bg-gray-800/60"}`}
-                    >
+                        ${isActive ? "border border-cyan-500/20 bg-cyan-500/10 text-cyan-400" : "text-gray-300 hover:bg-gray-800/60"}`}>
                       <span className={isActive ? "text-cyan-400" : "text-gray-500"}><IconLocation /></span>
                       <span className="flex-1 truncate text-left font-medium">{site.name}</span>
-                      <span className="rounded-full bg-gray-800 px-1.5 py-0.5 text-[10px] text-gray-500">
-                        {site.cameras.length}
-                      </span>
+                      <span className="rounded-full bg-gray-800 px-1.5 py-0.5 text-[10px] text-gray-500">{site.cameras.length}</span>
                       <IconChevron open={isExpanded} />
                     </button>
-
                     {isExpanded && hasCameras && (
                       <div className="mt-1 space-y-0.5 pl-3">
                         {site.cameras.map((camera) => {
@@ -292,8 +271,7 @@ export default function Sidebar({
                           return (
                             <button key={`alert-cam-${key}`} onClick={() => handleAlertCameraClick(camera, site.id)}
                               className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs transition
-                                ${isSel ? "bg-gray-800 text-cyan-400" : "text-gray-500 hover:bg-gray-800/40 hover:text-gray-300"}`}
-                            >
+                                ${isSel ? "bg-gray-800 text-cyan-400" : "text-gray-500 hover:bg-gray-800/40 hover:text-gray-300"}`}>
                               <span className={isSel ? "text-cyan-400" : "text-gray-600"}><IconCamera /></span>
                               <span className="flex-1 truncate">{camera.name}</span>
                               <StatusDot status={camera.status} />
@@ -302,10 +280,7 @@ export default function Sidebar({
                         })}
                       </div>
                     )}
-
-                    {isExpanded && !hasCameras && (
-                      <p className="px-3 py-2 text-xs text-gray-600">Aucune caméra</p>
-                    )}
+                    {isExpanded && !hasCameras && <p className="px-3 py-2 text-xs text-gray-600">Aucune caméra</p>}
                   </div>
                 );
               })}

@@ -6,17 +6,25 @@ import CameraView from "./pages/CameraView";
 import Playback from "./pages/Playback";
 import Alerts from "./pages/Alerts";
 import Settings from "./pages/Settings";
+import Statistics from "./pages/Statistics";
 import Login from "./pages/Login";
 import { ThemeProvider } from "./context/ThemeContext";
 import { fetchImouCameras } from "./services/ImouService";
 import axios from "axios";
 
-const BASE_URL = "http://localhost:5000";
+const BASE_URL = "/api";
 
+// ─── Token helpers ────────────────────────────────────────────────────────────
+function getToken()       { return sessionStorage.getItem("access_token"); }
+function setToken(token)  { sessionStorage.setItem("access_token", token); }
+function removeToken()    { sessionStorage.removeItem("access_token"); }
+function getAuthHeaders() { const t = getToken(); return t ? { Authorization: `Bearer ${t}` } : {}; }
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 function detectSiteFromName(name = "") {
   const normalized = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
-  if (normalized.startsWith("LOUGA"))    return "Louga";
-  if (normalized.startsWith("KAOLACK")) return "Kaolack";
+  if (normalized.startsWith("LOUGA"))     return "Louga";
+  if (normalized.startsWith("KAOLACK"))  return "Kaolack";
   if (normalized.startsWith("KOALOACK")) return "Kaolack";
   if (normalized.startsWith("DIOURBEL")) return "Diourbel";
   return "Dakar";
@@ -106,13 +114,16 @@ function App() {
   const [collapsed, setCollapsed]             = useState(false);
 
   useEffect(() => {
-    axios.get(`${BASE_URL}/me`, { withCredentials: true })
+    const token = getToken();
+    if (!token) { setCheckingAuth(false); return; }
+    axios.get(`${BASE_URL}/me`, { headers: getAuthHeaders() })
       .then((res) => { setIsAuthenticated(true); setCurrentUser(res.data); })
-      .catch(() => setIsAuthenticated(false))
+      .catch(() => { removeToken(); setIsAuthenticated(false); })
       .finally(() => setCheckingAuth(false));
   }, []);
 
-  const handleLoginSuccess = (user) => {
+  const handleLoginSuccess = (user, token) => {
+    setToken(token);
     setIsAuthenticated(true);
     setCurrentUser(user);
     if (user?.role === "admin_site" && user?.site) {
@@ -121,7 +132,8 @@ function App() {
   };
 
   const handleLogout = async () => {
-    try { await axios.post(`${BASE_URL}/logout`, {}, { withCredentials: true }); } catch {}
+    try { await axios.post(`${BASE_URL}/logout`, {}, { headers: getAuthHeaders() }); } catch {}
+    removeToken();
     setIsAuthenticated(false);
     setCurrentUser(null);
     setImouCameras([]);
@@ -245,6 +257,9 @@ function App() {
                   selectedSite={selectedSite}
                   selectedCamera={selectedCamera}
                 />
+              )}
+              {currentPage === "statistics" && (
+                <Statistics sites={sites} currentUser={currentUser} />
               )}
               {currentPage === "settings" && (
                 <Settings currentUser={currentUser} />

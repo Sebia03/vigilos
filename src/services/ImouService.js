@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const BASE_URL = "http://localhost:5000";
+const BASE_URL = "/api";
 
 export async function fetchImouCameras() {
   const response = await axios.get(`${BASE_URL}/devices`);
@@ -37,7 +37,7 @@ export async function fetchAlerts(deviceId, channelId = 0) {
 }
 export function proxyImageUrl(originalUrl) {
   if (!originalUrl) return null;
-  return `http://127.0.0.1:5000/image-proxy?url=${encodeURIComponent(originalUrl)}`;
+  return `/api/image-proxy?url=${encodeURIComponent(originalUrl)}`;
 }
 export async function wakeupDevice(deviceId) {
   const response = await axios.post(`${BASE_URL}/wakeup`, { deviceId });

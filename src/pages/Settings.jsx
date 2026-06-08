@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { useTheme } from "../context/ThemeContext";
+import { getAuthHeaders } from "../services/auth";
 import axios from "axios";
 
-const BASE_URL = "http://localhost:5000";
+const BASE_URL = "/api";
 const SITES = ["dakar", "louga", "kaolack", "diourbel"];
 const SITE_LABELS = { dakar: "Dakar", louga: "Louga", kaolack: "Kaolack", diourbel: "Diourbel" };
 
@@ -31,9 +32,9 @@ function UserModal({ user, onClose, onSave }) {
         ...(form.password ? { password: form.password } : {}),
       };
       if (isEdit) {
-        await axios.put(`${BASE_URL}/users/${user.id}`, payload, { withCredentials: true });
+        await axios.put(`${BASE_URL}/users/${user.id}`, payload, { headers: getAuthHeaders() });
       } else {
-        await axios.post(`${BASE_URL}/users`, payload, { withCredentials: true });
+        await axios.post(`${BASE_URL}/users`, payload, { headers: getAuthHeaders() });
       }
       onSave();
     } catch (err) {
@@ -102,16 +103,16 @@ function UserModal({ user, onClose, onSave }) {
 
 // ─── Section Utilisateurs ─────────────────────────────────────────────────────
 function UsersSection() {
-  const [users, setUsers]             = useState([]);
-  const [loading, setLoading]         = useState(false);
-  const [modalUser, setModalUser]     = useState(null);
+  const [users, setUsers]                 = useState([]);
+  const [loading, setLoading]             = useState(false);
+  const [modalUser, setModalUser]         = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
-  const [error, setError]             = useState("");
+  const [error, setError]                 = useState("");
 
   const loadUsers = async () => {
     try {
       setLoading(true);
-      const res = await axios.get(`${BASE_URL}/users`, { withCredentials: true });
+      const res = await axios.get(`${BASE_URL}/users`, { headers: getAuthHeaders() });
       setUsers(res.data);
     } catch {
       setError("Impossible de charger les utilisateurs");
@@ -124,7 +125,7 @@ function UsersSection() {
 
   const handleDelete = async (userId) => {
     try {
-      await axios.delete(`${BASE_URL}/users/${userId}`, { withCredentials: true });
+      await axios.delete(`${BASE_URL}/users/${userId}`, { headers: getAuthHeaders() });
       setDeleteConfirm(null);
       loadUsers();
     } catch (err) {
@@ -247,28 +248,21 @@ export default function Settings({ currentUser }) {
         <p className="mt-1 text-sm text-gray-400">Configuration de la plateforme VigilOS</p>
       </div>
 
-      {/* Tabs */}
       <div className="mb-6 flex gap-2 border-b border-gray-800 pb-0">
         {tabs.map((tab) => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id)}
             className={`px-4 py-2.5 text-sm font-medium transition border-b-2 -mb-px ${
-              activeTab === tab.id
-                ? "border-cyan-500 text-cyan-400"
-                : "border-transparent text-gray-500 hover:text-gray-300"
+              activeTab === tab.id ? "border-cyan-500 text-cyan-400" : "border-transparent text-gray-500 hover:text-gray-300"
             }`}>
             {tab.label}
           </button>
         ))}
       </div>
 
-      {/* Contenu */}
-      {activeTab === "users" && currentUser?.role === "superadmin" && (
-        <UsersSection />
-      )}
+      {activeTab === "users" && currentUser?.role === "superadmin" && <UsersSection />}
 
       {activeTab === "general" && (
         <div className="space-y-4">
-          {/* Thème */}
           <div className="flex items-center justify-between rounded-xl border border-gray-800 bg-gray-900 p-5">
             <div>
               <p className="text-sm font-medium text-white">Thème d'affichage</p>
@@ -280,7 +274,6 @@ export default function Settings({ currentUser }) {
             </button>
           </div>
 
-          {/* Infos compte */}
           <div className="rounded-xl border border-gray-800 bg-gray-900 p-5">
             <p className="text-sm font-medium text-white mb-3">Mon compte</p>
             <div className="space-y-2">
@@ -303,7 +296,6 @@ export default function Settings({ currentUser }) {
             </div>
           </div>
 
-          {/* Version */}
           <div className="rounded-xl border border-gray-800 bg-gray-900 p-5">
             <p className="text-sm font-medium text-white mb-3">À propos</p>
             <div className="space-y-2">
