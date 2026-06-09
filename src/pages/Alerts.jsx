@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { fetchAlerts } from "../services/ImouService";
 import ImouPlayer from "../components/ImouPlayer";
+import axios from "axios";
 
-const BASE_URL = "http://localhost:5000";
+const BASE_URL = "/api";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const TYPE_CONFIG = {
@@ -42,25 +42,22 @@ function formatTime(dateStr) {
   return d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 }
 
-// Calcule beginTime / endTime autour de l'heure de l'alerte (±60s)
-function getPlaybackTimes(dateStr, alertType) {
+function getPlaybackTimes(dateStr) {
   if (!dateStr) return null;
   const d = new Date(dateStr);
   if (isNaN(d)) return null;
-
   const pad = (n) => String(n).padStart(2, "0");
-  const fmt = (date) => {
-    return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
-  };
-
+  const fmt = (date) => `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
   const begin = new Date(d.getTime() - 60 * 1000);
   const end   = new Date(d.getTime() + 60 * 1000);
-  
-  // human_detection → cloud, motion_detection → device
-  const recordType = (alertType === "human_detection" || alertType === "human_infrared") ? "cloud" : "device";
-  
-  return { beginTime: fmt(begin), endTime: fmt(end), recordType };
+  return { beginTime: fmt(begin), endTime: fmt(end) };
 }
+
+function toDateInput(date) {
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}`;
+}
+
 // ─── Icônes ───────────────────────────────────────────────────────────────────
 function AlertIcon({ type, colorClass }) {
   if (type === "human_detection" || type === "human_infrared") {
@@ -97,9 +94,9 @@ function AlertIcon({ type, colorClass }) {
 
 // ─── Modale Playback ──────────────────────────────────────────────────────────
 function PlaybackModal({ alert, camera, onClose }) {
-  const cfg         = getAlertConfig(alert);
-  const type        = getAlertType(alert);
-  const dateStr     = alert.raw?.localDate || alert.localDate || null;
+  const cfg          = getAlertConfig(alert);
+  const type         = getAlertType(alert);
+  const dateStr      = alert.raw?.localDate || alert.localDate || null;
   const playbackTime = getPlaybackTimes(dateStr);
 
   useEffect(() => {
@@ -109,12 +106,9 @@ function PlaybackModal({ alert, camera, onClose }) {
   }, [onClose]);
 
   return (
-    <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-    >
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="w-full max-w-3xl rounded-2xl border border-gray-800 bg-gray-950 overflow-hidden shadow-2xl">
-        {/* Header */}
         <div className="flex items-center justify-between border-b border-gray-800 px-5 py-4">
           <div className="flex items-center gap-3">
             <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${cfg.iconBg}`}>
@@ -122,44 +116,26 @@ function PlaybackModal({ alert, camera, onClose }) {
             </div>
             <div>
               <p className={`text-sm font-semibold ${cfg.color}`}>{cfg.label}</p>
-              {dateStr && (
-                <p className="text-xs text-gray-500">
-                  {formatDate(dateStr)} · {formatTime(dateStr)}
-                </p>
-              )}
+              {dateStr && <p className="text-xs text-gray-500">{formatDate(dateStr)} · {formatTime(dateStr)}</p>}
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="rounded-lg border border-gray-700 bg-gray-900 px-3 py-1.5 text-xs text-gray-400 transition hover:bg-gray-800"
-          >
+          <button onClick={onClose} className="rounded-lg border border-gray-700 bg-gray-900 px-3 py-1.5 text-xs text-gray-400 transition hover:bg-gray-800">
             ESC / Fermer
           </button>
         </div>
-
-        {/* Player */}
         <div className="aspect-video w-full bg-black">
           {playbackTime && camera ? (
-            <ImouPlayer
-              camera={camera}
-              playbackTime={playbackTime}
-            />
+            <ImouPlayer camera={camera} playbackTime={playbackTime} />
           ) : (
             <div className="flex h-full w-full items-center justify-center text-sm text-gray-500">
               Impossible de lancer le playback — date d'alerte manquante
             </div>
           )}
         </div>
-
-        {/* Info playback */}
         {playbackTime && (
           <div className="flex items-center justify-between border-t border-gray-800 px-5 py-3">
-            <p className="text-xs text-gray-600 font-mono">
-              {playbackTime.beginTime} → {playbackTime.endTime}
-            </p>
-            <p className="text-xs text-gray-600">
-              Caméra : {camera?.name || alert.raw?.name || "—"}
-            </p>
+            <p className="text-xs text-gray-600 font-mono">{playbackTime.beginTime} → {playbackTime.endTime}</p>
+            <p className="text-xs text-gray-600">Caméra : {camera?.name || alert.raw?.name || "—"}</p>
           </div>
         )}
       </div>
@@ -174,42 +150,23 @@ function AlertCard({ alert, camera, onPlay }) {
   const dateStr = alert.raw?.localDate || alert.localDate || null;
 
   return (
-    <div
-      onClick={() => onPlay(alert)}
-      className={`cursor-pointer overflow-hidden rounded-xl border bg-gray-900 transition hover:scale-[1.01] hover:shadow-lg hover:shadow-black/30 ${cfg.border}`}
-    >
-      {/* Zone visuelle */}
+    <div onClick={() => onPlay(alert)}
+      className={`cursor-pointer overflow-hidden rounded-xl border bg-gray-900 transition hover:scale-[1.01] hover:shadow-lg hover:shadow-black/30 ${cfg.border}`}>
       <div className={`relative flex h-44 w-full items-center justify-center ${cfg.iconBg}`}>
         <div className={`absolute h-32 w-32 rounded-full opacity-20 ${cfg.bg}`} />
         <div className={`absolute h-20 w-20 rounded-full opacity-30 ${cfg.bg}`} />
         <AlertIcon type={type} colorClass={cfg.color} />
-
-        {/* Badge type */}
         <div className={`absolute left-2 top-2 flex items-center gap-1.5 rounded-full border px-2.5 py-1 ${cfg.bg} ${cfg.border}`}>
           <span className={`h-1.5 w-1.5 rounded-full ${cfg.dot}`} />
           <span className={`text-[11px] font-medium ${cfg.color}`}>{cfg.label}</span>
         </div>
-
-        {/* Bouton play */}
-        <div className="absolute right-2 top-2 flex items-center gap-1.5 rounded-lg border border-white/10 bg-black/60 px-2.5 py-1.5 text-xs font-medium text-white opacity-0 transition group-hover:opacity-100">
-          <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M8 5v14l11-7z"/>
-          </svg>
-          Rejouer
-        </div>
-
-        {/* Overlay hover */}
         <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition hover:bg-black/30">
           <div className="flex items-center gap-2 rounded-xl border border-white/20 bg-black/60 px-4 py-2 opacity-0 transition hover:opacity-100">
-            <svg className="h-4 w-4 text-white" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M8 5v14l11-7z"/>
-            </svg>
+            <svg className="h-4 w-4 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
             <span className="text-sm font-medium text-white">Voir la vidéo</span>
           </div>
         </div>
       </div>
-
-      {/* Infos */}
       <div className="p-3">
         <div className="flex items-start justify-between gap-2">
           <div>
@@ -233,13 +190,28 @@ function AlertCard({ alert, camera, onPlay }) {
   );
 }
 
+// ─── Raccourcis de dates ──────────────────────────────────────────────────────
+const DATE_SHORTCUTS = [
+  { label: "Aujourd'hui",   days: 0 },
+  { label: "Hier",          days: 1 },
+  { label: "3 derniers j.", days: 3 },
+  { label: "7 derniers j.", days: 7 },
+];
+
 // ─── Alerts Page ──────────────────────────────────────────────────────────────
 export default function Alerts({ selectedCamera = null, selectedSite = null }) {
-  const [alerts, setAlerts]         = useState([]);
-  const [loading, setLoading]       = useState(false);
-  const [error, setError]           = useState(null);
-  const [filter, setFilter]         = useState("all");
+  const today    = new Date();
+  const weekAgo  = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+  const [alerts, setAlerts]               = useState([]);
+  const [loading, setLoading]             = useState(false);
+  const [error, setError]                 = useState(null);
+  const [filter, setFilter]               = useState("all");
   const [playbackAlert, setPlaybackAlert] = useState(null);
+  const [dateFrom, setDateFrom]           = useState(toDateInput(weekAgo));
+  const [dateTo, setDateTo]               = useState(toDateInput(today));
+  const [activeShortcut, setActiveShortcut] = useState(7);
+  const [source, setSource]               = useState("local_db");
 
   const deviceId   = selectedCamera?.deviceId || selectedCamera?.id;
   const cameraName = selectedCamera?.name || "Caméra";
@@ -248,21 +220,47 @@ export default function Alerts({ selectedCamera = null, selectedSite = null }) {
   useEffect(() => {
     if (!deviceId) { setAlerts([]); setLoading(false); setError(null); return; }
     loadAlerts();
-    const interval = setInterval(loadAlerts, 15000);
-    return () => clearInterval(interval);
-  }, [deviceId, channelId]);
+  }, [deviceId, channelId, dateFrom, dateTo]);
+
+  const applyShortcut = (days) => {
+    setActiveShortcut(days);
+    const to   = new Date();
+    const from = new Date();
+    if (days === 0) {
+      from.setHours(0, 0, 0, 0);
+    } else {
+      from.setDate(from.getDate() - days);
+    }
+    setDateFrom(toDateInput(from));
+    setDateTo(toDateInput(to));
+  };
 
   const loadAlerts = async () => {
     if (!deviceId) return;
     try {
       setLoading(true);
       setError(null);
-      const { fetchAlerts } = await import("../services/ImouService");
-      const data = await fetchAlerts(deviceId, channelId);
-      const raw  = data?.success ? data.alarms || [] : [];
+
+      const token = sessionStorage.getItem("access_token");
+      const params = new URLSearchParams({
+        deviceId,
+        channelId,
+        count: 100,
+        useDb: "true",
+        ...(dateFrom ? { beginTime: `${dateFrom} 00:00:00` } : {}),
+        ...(dateTo   ? { endTime:   `${dateTo} 23:59:59`   } : {}),
+      });
+
+      const res = await axios.get(`${BASE_URL}/alerts?${params}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+
+      const data = res.data;
+      setSource(data.source || "imou_api");
+      const raw    = data?.success ? data.alarms || [] : [];
       const sorted = [...raw].sort((a, b) => {
-        const da = new Date(a.raw?.localDate || 0).getTime();
-        const db = new Date(b.raw?.localDate || 0).getTime();
+        const da = new Date(a.raw?.localDate || a.localDate || 0).getTime();
+        const db = new Date(b.raw?.localDate || b.localDate || 0).getTime();
         return db - da;
       });
       setAlerts(sorted);
@@ -309,13 +307,8 @@ export default function Alerts({ selectedCamera = null, selectedSite = null }) {
   return (
     <div className="animate-fadeIn p-6">
 
-      {/* Modale playback */}
       {playbackAlert && (
-        <PlaybackModal
-          alert={playbackAlert}
-          camera={selectedCamera}
-          onClose={() => setPlaybackAlert(null)}
-        />
+        <PlaybackModal alert={playbackAlert} camera={selectedCamera} onClose={() => setPlaybackAlert(null)} />
       )}
 
       {/* Header */}
@@ -326,19 +319,55 @@ export default function Alerts({ selectedCamera = null, selectedSite = null }) {
             <span className="ml-2 text-gray-500">—</span>
             <span className="ml-2 text-lg font-medium text-gray-300">{cameraName}</span>
           </h1>
-          <p className="mt-1 text-sm text-gray-500 font-mono">{deviceId}</p>
+          <div className="mt-1 flex items-center gap-2">
+            <p className="text-sm text-gray-500 font-mono">{deviceId}</p>
+            {source === "local_db" && (
+              <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-400">
+                Base locale
+              </span>
+            )}
+          </div>
         </div>
-        <button
-          onClick={loadAlerts}
-          disabled={loading}
-          className="flex items-center gap-2 rounded-xl border border-gray-700 bg-gray-900 px-4 py-2 text-sm text-gray-300 transition hover:bg-gray-800 disabled:opacity-50"
-        >
+        <button onClick={loadAlerts} disabled={loading}
+          className="flex items-center gap-2 rounded-xl border border-gray-700 bg-gray-900 px-4 py-2 text-sm text-gray-300 transition hover:bg-gray-800 disabled:opacity-50">
           <svg className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
               d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
           </svg>
           Actualiser
         </button>
+      </div>
+
+      {/* ── Filtre de date ─────────────────────────────────────────────── */}
+      <div className="mb-6 rounded-xl border border-gray-800 bg-gray-900 p-4">
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Raccourcis */}
+          <div className="flex flex-wrap gap-2">
+            {DATE_SHORTCUTS.map((s) => (
+              <button key={s.days} onClick={() => applyShortcut(s.days)}
+                className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                  activeShortcut === s.days
+                    ? "border border-cyan-500/30 bg-cyan-500/10 text-cyan-400"
+                    : "border border-gray-700 text-gray-400 hover:bg-gray-800"
+                }`}>
+                {s.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="h-5 w-px bg-gray-700 hidden sm:block" />
+
+          {/* Sélecteurs de date */}
+          <div className="flex items-center gap-2">
+            <input type="date" value={dateFrom}
+              onChange={(e) => { setDateFrom(e.target.value); setActiveShortcut(null); }}
+              className="rounded-lg border border-gray-700 bg-gray-800 px-3 py-1.5 text-xs text-gray-200 outline-none focus:border-cyan-500/50" />
+            <span className="text-xs text-gray-600">→</span>
+            <input type="date" value={dateTo}
+              onChange={(e) => { setDateTo(e.target.value); setActiveShortcut(null); }}
+              className="rounded-lg border border-gray-700 bg-gray-800 px-3 py-1.5 text-xs text-gray-200 outline-none focus:border-cyan-500/50" />
+          </div>
+        </div>
       </div>
 
       {/* Stats */}
@@ -352,7 +381,7 @@ export default function Alerts({ selectedCamera = null, selectedSite = null }) {
           </div>
           <p className="text-xs font-medium uppercase tracking-widest text-gray-500">Total alertes</p>
           <h3 className="mt-2 text-4xl font-bold text-white">{alerts.length}</h3>
-          <p className="mt-1 text-xs text-gray-600">Dernières 24h</p>
+          <p className="mt-1 text-xs text-gray-600">{dateFrom} → {dateTo}</p>
         </div>
 
         <div className="relative overflow-hidden rounded-xl border border-cyan-500/20 bg-gray-900 p-5">
@@ -396,7 +425,7 @@ export default function Alerts({ selectedCamera = null, selectedSite = null }) {
         </div>
       </div>
 
-      {/* Filtres */}
+      {/* Filtres par type */}
       {presentTypes.length > 1 && (
         <div className="mb-5 flex flex-wrap items-center gap-2">
           <button onClick={() => setFilter("all")}
@@ -433,13 +462,11 @@ export default function Alerts({ selectedCamera = null, selectedSite = null }) {
         </div>
       )}
 
-      {error && (
-        <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-400">{error}</div>
-      )}
+      {error && <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-400">{error}</div>}
 
       {!loading && !error && filtered.length === 0 && (
         <div className="rounded-2xl border border-gray-800 bg-gray-900 p-10 text-center text-gray-400">
-          {filter !== "all" ? "Aucune alerte pour ce filtre." : "Aucune alerte pour cette caméra."}
+          {filter !== "all" ? "Aucune alerte pour ce filtre." : "Aucune alerte pour cette période."}
         </div>
       )}
 
@@ -458,18 +485,13 @@ export default function Alerts({ selectedCamera = null, selectedSite = null }) {
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 00-8 8h4z" />
                 </svg>
-                Actualisation...
+                Chargement...
               </p>
             )}
           </div>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             {filtered.map((alert) => (
-              <AlertCard
-                key={alert.alarmId}
-                alert={alert}
-                camera={selectedCamera}
-                onPlay={setPlaybackAlert}
-              />
+              <AlertCard key={alert.alarmId || alert.alarm_id} alert={alert} camera={selectedCamera} onPlay={setPlaybackAlert} />
             ))}
           </div>
         </>

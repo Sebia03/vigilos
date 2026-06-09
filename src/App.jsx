@@ -98,7 +98,7 @@ function DashboardSkeleton() {
   );
 }
 
-const REFRESH_INTERVAL = 30000;
+const REFRESH_INTERVAL = 120000;
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
