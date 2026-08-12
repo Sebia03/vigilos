@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <link rel="stylesheet" href="/imou-player.css">
+  <title>Test isolé SDK natif IMOU</title>
+  <style>
+    body { font-family: monospace; background:#111; color:#eee; padding:20px; }
+    h2 { color: #fff; }
+    label { display:block; margin-top:10px; font-size: 13px; color:#999; }
+    input { padding: 8px; width: 500px; max-width: 90vw; background:#222; color:#eee; border:1px solid #444; }
+    button { padding: 10px 16px; margin-top:14px; cursor:pointer; background:#0af; color:#fff; border:none; border-radius:4px; }
+    #player { width: 800px; max-width: 90vw; height: 450px; background:#000; margin-top:20px; border: 1px solid #333; }
+    #log { white-space: pre-wrap; background:#000; color:#0f0; padding:10px; margin-top:14px; max-height:300px; overflow:auto; font-size:12px; border:1px solid #333; }
+  </style>
+</head>
+<script src="/imou-player.js"></script>
+<body>
+  <h2>Test isolé SDK natif IMOU (sans React)</h2>
+  <p style="color:#888">Objectif : isoler si le 13002 vient de nos paramètres/backend, ou de React/du cycle de vie du composant.</p>
+
+  <label>Token JWT VigilOS (celui de sessionStorage → access_token, colle-le ici)</label>
+  <input id="jwt" placeholder="eyJ..." />
+
+  <label>deviceId (caméra solaire à tester)</label>
+  <input id="deviceId" value="E7998CBPSFCA40A" />
+
+  <label>channelId</label>
+  <input id="channelId" value="0" />
+
+  <br>
+  <button onclick="startTest()">Récupérer kitToken + Lancer le player</button>
+
+  <div id="imou-test-container"></div>
+  <div id="log"></div>
+
+  <script>
+    function log(msg) {
+      const el = document.getElementById('log');
+      el.textContent += msg + "\n";
+      el.scrollTop = el.scrollHeight;
+      console.log(msg);
+    }
+
+    async function startTest() {
+      document.getElementById('log').textContent = '';
+      const jwt        = document.getElementById('jwt').value.trim();
+      const deviceId    = document.getElementById('deviceId').value.trim();
+      const channelId   = document.getElementById('channelId').value.trim();
+
+      log('Récupération du kitToken depuis notre backend...');
+      try {
+        const res = await fetch('http://localhost:5000/kit-token', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + jwt,
+          },
+          body: JSON.stringify({ deviceId, channelId: Number(channelId) }),
+        });
+        const data = await res.json();
+        log('Réponse /kit-token : ' + JSON.stringify(data));
+
+        if (!data.kitToken) {
+          log('ERREUR : pas de kitToken reçu, on s\'arrête ici.');
+          return;
+        }
+
+        const container = document.getElementById('imou-test-container');
+        container.innerHTML = '';
+        // Ne pas renommer l'id du conteneur d'origine — ça cassait les essais
+        // suivants (document.getElementById('player') devenait null après
+        // le 1er clic). On garde le même id ("imou-test-container") du
+        // début à la fin, déjà présent dans le HTML.
+
+        const params = {
+          id:                  'imou-test-container',
+          domain:              data.domain,
+          width:               800,
+          height:              450,
+          deviceId:            deviceId,
+          channelId:           Number(channelId),
+          token:               data.kitToken,
+          type:                1,
+          streamId:            0,
+          bSupportMultithread: true,
+          encryptPwd:          deviceId,
+        };
+
+        log('Paramètres envoyés au SDK : ' + JSON.stringify(params, null, 2));
+
+        if (typeof window.imouPlayer === 'undefined') {
+          log('ERREUR : window.imouPlayer est undefined — le SDK ne s\'est pas chargé.');
+          return;
+        }
+
+        const player = new window.imouPlayer(params);
+        log('Player instancié — observe la zone vidéo ci-dessus.');
+
+        // Capture tout changement dans le conteneur (y compris les messages
+        // d'erreur que le SDK injecte lui-même, comme "Play failed" ou
+        // "Device no response... error code:13002")
+        const observer = new MutationObserver(() => {
+          log('[DOM changé] ' + container.textContent.trim());
+        });
+        observer.observe(container, { childList: true, subtree: true, characterData: true });
+
+      } catch (err) {
+        log('ERREUR JS : ' + err.message);
+      }
+    }
+  </script>
+</body>
+</html>

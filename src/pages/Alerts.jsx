@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+//import ImouPlayer from "../components/ImouPlayer";
 import ImouPlayer from "../components/ImouPlayer";
 import axios from "axios";
 
@@ -312,8 +313,8 @@ export default function Alerts({ selectedCamera = null, selectedSite = null }) {
       )}
 
       {/* Header */}
-      <div className="mb-6 flex items-start justify-between">
-        <div>
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
           <h1 className="text-2xl font-bold text-white truncate max-w-xl">
             Alertes
             <span className="ml-2 text-gray-500">—</span>
@@ -329,7 +330,7 @@ export default function Alerts({ selectedCamera = null, selectedSite = null }) {
           </div>
         </div>
         <button onClick={loadAlerts} disabled={loading}
-          className="flex items-center gap-2 rounded-xl border border-gray-700 bg-gray-900 px-4 py-2 text-sm text-gray-300 transition hover:bg-gray-800 disabled:opacity-50">
+          className="flex items-center justify-center gap-2 rounded-xl border border-gray-700 bg-gray-900 px-4 py-2 text-sm text-gray-300 transition hover:bg-gray-800 disabled:opacity-50 sm:justify-start sm:self-start">
           <svg className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
               d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -358,7 +359,7 @@ export default function Alerts({ selectedCamera = null, selectedSite = null }) {
           <div className="h-5 w-px bg-gray-700 hidden sm:block" />
 
           {/* Sélecteurs de date */}
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <input type="date" value={dateFrom}
               onChange={(e) => { setDateFrom(e.target.value); setActiveShortcut(null); }}
               className="rounded-lg border border-gray-700 bg-gray-800 px-3 py-1.5 text-xs text-gray-200 outline-none focus:border-cyan-500/50" />

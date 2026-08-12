@@ -1,72 +1,20 @@
-import { useEffect, useRef, useState, useCallback } from "react";
-import ImouPlayer from "../components/ImouPlayer";
+import { useEffect, useRef, useState } from "react";
 import { fetchAlerts } from "../services/ImouService";
+import { isSolarCamera } from "../constants/solarCameras";
 
 const BASE_URL = "/api";
-const MAX_LIVE_SLOTS = 4;
 
 function proxyImageUrl(url) {
   if (!url) return null;
   return `${BASE_URL}/image-proxy?url=${encodeURIComponent(url)}`;
 }
 
-// ─── Fullscreen overlay ───────────────────────────────────────────────────────
-function CameraFullscreen({ camera, onClose }) {
-  useEffect(() => {
-    const handler = (e) => { if (e.key === "Escape") onClose(); };
-    document.addEventListener("keydown", handler);
-    document.body.classList.add("imou-fullscreen-active");
-    return () => {
-      document.removeEventListener("keydown", handler);
-      document.body.classList.remove("imou-fullscreen-active");
-    };
-  }, [onClose]);
-
-  return (
-    <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-black" onDoubleClick={onClose}>
-      <div style={{ width: "90vw", maxWidth: "1200px" }}>
-        <div className="mb-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
-            <span className="font-mono text-sm text-gray-200">{camera.name}</span>
-            <span className="font-mono text-xs text-gray-500">— {camera.site}</span>
-          </div>
-          <button onClick={onClose}
-            className="rounded-lg border border-white/10 bg-white/5 px-3 py-1 font-mono text-xs text-gray-400 transition hover:bg-white/10">
-            ESC / Fermer
-          </button>
-        </div>
-        <div className="imou-player-card w-full overflow-hidden rounded-xl border border-cyan-500/20 bg-black" style={{ aspectRatio: "16/9" }}>
-          <ImouPlayer camera={camera} />
-        </div>
-        <p className="mt-3 text-center font-mono text-xs text-white/20">Double-clic ou ESC pour fermer</p>
-      </div>
-    </div>
-  );
-}
-
 // ─── Camera Card ──────────────────────────────────────────────────────────────
-// isPlaying est maintenant entièrement piloté par liveSlots (via IntersectionObserver dans le parent)
-function CameraCard({ camera, isSelected, onCardClick, liveSlots, snapshot, registerRef }) {
-  const [fsOpen, setFsOpen] = useState(false);
-  const [waking, setWaking] = useState(false);
-  const cardRef = useRef(null);
-
+function CameraCard({ camera, isSelected, onCardClick, snapshot }) {
   const isOnline = camera.status === "online";
   const isSleep  = camera.status === "sleep";
-  const isOff    = !isOnline && !isSleep;
-  const isPlaying = liveSlots.includes(camera.id);
-
-  // Enregistrer la ref auprès du parent pour l'IntersectionObserver
-  useEffect(() => {
-    if (cardRef.current) registerRef(camera.id, cardRef.current);
-    return () => registerRef(camera.id, null);
-  }, [camera.id, registerRef]);
-
-  useEffect(() => {
-    if (isPlaying && isSleep) setWaking(true);
-    if (!isPlaying) setWaking(false);
-  }, [isPlaying, isSleep]);
+  const isOff    = camera.status === "offline";
+  const isSolar  = isSolarCamera(camera);
 
   const getStatusBadge = () => {
     if (isOnline) return <span className="shrink-0 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-400">EN LIGNE</span>;
@@ -75,83 +23,51 @@ function CameraCard({ camera, isSelected, onCardClick, liveSlots, snapshot, regi
   };
 
   return (
-    <>
-      {fsOpen && <CameraFullscreen camera={camera} onClose={() => setFsOpen(false)} />}
-
-      <div
-        ref={cardRef}
-        data-camera-id={camera.id}
-        data-online={isOnline ? "1" : "0"}
-        onClick={() => !isOff && onCardClick(camera)}
-        onDoubleClick={() => isPlaying && setFsOpen(true)}
-        className={`group overflow-hidden rounded-xl border bg-gray-900 transition
-          ${isOff ? "opacity-60" : "cursor-pointer hover:scale-[1.01]"}
-          ${isSelected ? "border-cyan-500/40 ring-1 ring-cyan-500/20" : "border-gray-800 hover:border-cyan-500/30"}`}
-      >
-        <div className="flex items-start justify-between gap-3 p-2 pb-1">
-          <div className="min-w-0">
-            <h3 className="truncate text-base font-semibold text-white">{camera.name}</h3>
-            <p className="text-sm text-gray-400">{camera.site}</p>
-          </div>
-          {getStatusBadge()}
+    <div
+      data-camera-id={camera.id}
+      onClick={() => !isOff && onCardClick(camera)}
+      className={`group overflow-hidden rounded-xl border bg-gray-900 transition
+        ${isOff ? "opacity-60" : "cursor-pointer hover:scale-[1.01]"}
+        ${isSelected ? "border-cyan-500/40 ring-1 ring-cyan-500/20" : "border-gray-800 hover:border-cyan-500/30"}`}
+    >
+      <div className="flex items-start justify-between gap-3 p-2 pb-1">
+        <div className="min-w-0">
+          <h3 className="truncate text-base font-semibold text-white">{camera.name}</h3>
+          <p className="text-sm text-gray-400">{camera.site}</p>
         </div>
-
-        <div className="relative mx-2 mb-2 overflow-hidden rounded-xl bg-black" style={{ height: "176px" }}>
-          {isPlaying && (
-            <div className="imou-player-card absolute inset-0">
-              <ImouPlayer camera={camera} onError={() => setWaking(false)} />
-            </div>
-          )}
-
-          {!isPlaying && snapshot?.thumbUrl && (
-            <>
-              <img src={snapshot.thumbUrl} alt={camera.name}
-                className="h-full w-full object-cover opacity-60"
-                onError={(e) => { e.currentTarget.style.display = "none"; }} />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
-              {snapshot.localDate && (
-                <div className="absolute bottom-2 left-2">
-                  <span className="rounded bg-black/60 px-2 py-0.5 font-mono text-[10px] text-gray-400">{snapshot.localDate}</span>
-                </div>
-              )}
-            </>
-          )}
-
-          {!isPlaying && !snapshot?.thumbUrl && (
-            <div className="flex h-full w-full items-center justify-center">
-              {isOff
-                ? <p className="text-sm text-gray-600">Hors ligne</p>
-                : <p className="text-sm text-gray-600">Chargement à l'écran...</p>
-              }
-            </div>
-          )}
-
-          {/* Badge live discret, pas de bouton manuel */}
-          {isPlaying && (
-            <div className="absolute right-2 top-2 flex items-center gap-1.5 rounded-lg bg-black/60 border border-white/10 px-2.5 py-1.5 text-xs font-medium text-white">
-              <span className="h-1.5 w-1.5 rounded-full bg-red-400 animate-pulse" />
-              LIVE
-            </div>
-          )}
-
-          {waking && isPlaying && (
-            <div className="absolute bottom-2 right-2 flex items-center gap-1.5 rounded bg-amber-500/20 px-2 py-0.5">
-              <svg className="h-3 w-3 animate-spin text-amber-400" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 00-8 8h4z"/>
-              </svg>
-              <span className="font-mono text-[10px] text-amber-400">Réveil...</span>
-            </div>
-          )}
-
-          {isPlaying && (
-            <div className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity group-hover:opacity-100 pointer-events-none">
-              <span className="rounded bg-black/50 px-2 py-1 font-mono text-xs text-cyan-400/80">⤢ double-clic</span>
-            </div>
-          )}
-        </div>
+        {getStatusBadge()}
       </div>
-    </>
+      <div className="relative mx-2 mb-2 overflow-hidden rounded-xl bg-black" style={{ height: "176px" }}>
+        {snapshot?.thumbUrl && (
+          <>
+            <img src={snapshot.thumbUrl} alt={camera.name}
+              className="h-full w-full object-cover opacity-60"
+              onError={(e) => { e.currentTarget.style.display = "none"; }} />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+            {snapshot.localDate && (
+              <div className="absolute bottom-2 left-2">
+                <span className="rounded bg-black/60 px-2 py-0.5 font-mono text-[10px] text-gray-400">{snapshot.localDate}</span>
+              </div>
+            )}
+          </>
+        )}
+        {!snapshot?.thumbUrl && (
+          <div className="flex h-full w-full items-center justify-center">
+            {isOff
+              ? <p className="text-sm text-gray-600">Hors ligne</p>
+              : <p className="text-sm text-gray-600">Aucune capture disponible</p>
+            }
+          </div>
+        )}
+        {!isOff && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className={`rounded bg-black/50 px-2 py-1 font-mono text-xs ${isSolar ? "text-amber-400/90" : "text-cyan-400/80"}`}>
+              ▶ cliquer pour démarrer
+            </span>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -217,9 +133,21 @@ function SiteCard({ site, onClick }) {
 function useLastSnapshots(cameras) {
   const [snapshots, setSnapshots] = useState({});
   const fetchedRef = useRef(new Set());
+  const [refreshTick, setRefreshTick] = useState(0);
+
+  // Rafraîchit périodiquement pour que les vignettes restent à jour même sur
+  // des caméras en ligne qui ne streament pas activement (gain de vivacité
+  // visuelle sans coût de connexion vidéo).
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchedRef.current.clear();
+      setRefreshTick((t) => t + 1);
+    }, 3 * 60 * 1000); // toutes les 3 minutes
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
-    cameras.filter((c) => c.status !== "online" && c.deviceId).forEach(async (camera) => {
+    cameras.filter((c) => c.deviceId).forEach(async (camera) => {
       if (fetchedRef.current.has(camera.deviceId)) return;
       fetchedRef.current.add(camera.deviceId);
       try {
@@ -237,90 +165,26 @@ function useLastSnapshots(cameras) {
         }
       } catch {}
     });
-  }, [cameras]);
-
-  useEffect(() => {
-    cameras.filter((c) => c.status === "online").forEach((c) => fetchedRef.current.delete(c.deviceId));
-  }, [cameras]);
+  }, [cameras, refreshTick]);
 
   return snapshots;
 }
 
-// ─── Hook IntersectionObserver pour autoplay au scroll ───────────────────────
-function useScrollAutoplay(cameras, containerSelector = null) {
-  const [liveSlots, setLiveSlots] = useState([]);
-  const elementsRef   = useRef(new Map());   // cameraId -> DOM element
-  const visibleRef    = useRef(new Map());   // cameraId -> intersectionRatio
-  const observerRef   = useRef(null);
-
-  const registerRef = useCallback((cameraId, el) => {
-    if (el) {
-      elementsRef.current.set(cameraId, el);
-      if (observerRef.current) observerRef.current.observe(el);
-    } else {
-      const old = elementsRef.current.get(cameraId);
-      if (old && observerRef.current) observerRef.current.unobserve(old);
-      elementsRef.current.delete(cameraId);
-      visibleRef.current.delete(cameraId);
-    }
-  }, []);
-
-  const recompute = useCallback(() => {
-    // Trier les caméras visibles par ratio de visibilité décroissant,
-    // puis par position dans la liste (ordre DOM) en cas d'égalité.
-    const onlineIds = new Set(cameras.filter((c) => c.status === "online").map((c) => c.id));
-
-    const visibleEntries = Array.from(visibleRef.current.entries())
-      .filter(([id, ratio]) => ratio > 0.4 && onlineIds.has(id));
-
-    // Ordonner par position verticale (top) pour un comportement naturel de scroll
-    visibleEntries.sort((a, b) => {
-      const elA = elementsRef.current.get(a[0]);
-      const elB = elementsRef.current.get(b[0]);
-      if (!elA || !elB) return 0;
-      return elA.getBoundingClientRect().top - elB.getBoundingClientRect().top;
-    });
-
-    const newSlots = visibleEntries.slice(0, MAX_LIVE_SLOTS).map(([id]) => id);
-    setLiveSlots((prev) => {
-      const sameLength = prev.length === newSlots.length;
-      const sameContent = sameLength && prev.every((id, i) => id === newSlots[i]);
-      return sameContent ? prev : newSlots;
-    });
-  }, [cameras]);
-
-  useEffect(() => {
-    observerRef.current = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          const id = entry.target.getAttribute("data-camera-id");
-          if (id) visibleRef.current.set(id, entry.intersectionRatio);
-        });
-        recompute();
-      },
-      { threshold: [0, 0.4, 0.6, 1] }
-    );
-
-    // Observer tous les éléments déjà enregistrés
-    elementsRef.current.forEach((el) => observerRef.current.observe(el));
-
-    return () => observerRef.current?.disconnect();
-  }, [recompute]);
-
-  // Recalcule au montage / changement de liste (ex: changement de site)
-  useEffect(() => {
-    visibleRef.current.clear();
-    setLiveSlots([]);
-  }, [cameras.map((c) => c.id).join(",")]);
-
-  return { liveSlots, registerRef };
-}
-
 // ─── Dashboard ────────────────────────────────────────────────────────────────
-export default function Dashboard({ sites, selectedSite, setSelectedSite, selectedCamera, setSelectedCamera, setCurrentPage }) {
+export default function Dashboard({ sites, selectedSite, setSelectedSite, selectedCamera, setSelectedCamera, setCurrentPage, onMultiView }) {
   const allCameras     = sites.flatMap((s) => s.cameras);
   const currentSite    = selectedSite ? sites.find((s) => s.id === selectedSite) || null : null;
   const visibleCameras = currentSite ? currentSite.cameras : [];
+
+  // S'il n'y a qu'un seul site, on saute directement à sa grille de caméras
+  // plutôt que d'afficher un écran "choisir un site" avec une seule option.
+  // Dès qu'un deuxième site apparaît (redevient actif), ce comportement
+  // s'efface automatiquement et l'écran de sélection revient.
+  useEffect(() => {
+    if (!selectedSite && sites.length === 1) {
+      setSelectedSite(sites[0].id);
+    }
+  }, [sites, selectedSite, setSelectedSite]);
 
   const sorted = currentSite ? [
     ...visibleCameras.filter((c) => c.status === "online"),
@@ -333,7 +197,6 @@ export default function Dashboard({ sites, selectedSite, setSelectedSite, select
   const sleep   = allCameras.filter((c) => c.status === "sleep").length;
   const offline = allCameras.filter((c) => c.status === "offline").length;
 
-  const { liveSlots, registerRef } = useScrollAutoplay(sorted);
   const snapshots = useLastSnapshots(visibleCameras);
 
   const handleCardClick = (camera) => { setSelectedCamera(camera); setCurrentPage("cameraView"); };
@@ -424,22 +287,36 @@ export default function Dashboard({ sites, selectedSite, setSelectedSite, select
           <div className="mb-4 flex items-center justify-between">
             <div>
               <div className="flex items-center gap-2">
-                <button onClick={() => setSelectedSite(null)}
-                  className="flex items-center gap-1 text-sm text-gray-500 hover:text-cyan-400 transition">
-                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
-                  Tous les sites
-                </button>
-                <span className="text-gray-700">/</span>
+                {sites.length > 1 && (
+                  <>
+                    <button onClick={() => setSelectedSite(null)}
+                      className="flex items-center gap-1 text-sm text-gray-500 hover:text-cyan-400 transition">
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                      </svg>
+                      Tous les sites
+                    </button>
+                    <span className="text-gray-700">/</span>
+                  </>
+                )}
                 <h2 className="text-xl font-semibold text-white">{currentSite.name}</h2>
               </div>
               <p className="mt-1 text-sm text-gray-400">
-                {liveSlots.length > 0
-                  ? `${liveSlots.length}/${MAX_LIVE_SLOTS} flux live actif${liveSlots.length > 1 ? "s" : ""} · les flux suivent votre défilement`
-                  : "Faites défiler pour démarrer les flux automatiquement"}
+                Cliquez sur une caméra pour voir son flux en direct
               </p>
             </div>
+
+            {/* Bouton multi-écran */}
+            {onMultiView && (
+              <button onClick={onMultiView}
+                className="flex items-center gap-2 rounded-xl border border-gray-700 bg-gray-900 px-4 py-2 text-sm text-gray-300 transition hover:bg-gray-800 hover:text-cyan-400 hover:border-cyan-500/30">
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                    d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
+                </svg>
+                Multi-écran
+              </button>
+            )}
           </div>
 
           {sorted.length === 0 ? (
@@ -454,9 +331,7 @@ export default function Dashboard({ sites, selectedSite, setSelectedSite, select
                   camera={camera}
                   isSelected={selectedCamera?.id === camera.id}
                   onCardClick={handleCardClick}
-                  liveSlots={liveSlots}
                   snapshot={snapshots[camera.deviceId] || null}
-                  registerRef={registerRef}
                 />
               ))}
             </div>

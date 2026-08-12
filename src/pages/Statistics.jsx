@@ -172,7 +172,7 @@ export default function Statistics({ sites, currentUser }) {
     <div className="animate-fadeIn p-6">
 
       {/* Header */}
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">Statistiques</h1>
           <p className="mt-1 text-sm text-gray-400">
@@ -180,7 +180,7 @@ export default function Statistics({ sites, currentUser }) {
           </p>
         </div>
         <button onClick={loadAllAlerts} disabled={loading}
-          className="flex items-center gap-2 rounded-xl border border-gray-700 bg-gray-900 px-4 py-2 text-sm text-gray-300 transition hover:bg-gray-800 disabled:opacity-50">
+          className="flex items-center justify-center gap-2 rounded-xl border border-gray-700 bg-gray-900 px-4 py-2 text-sm text-gray-300 transition hover:bg-gray-800 disabled:opacity-50 sm:justify-start sm:self-start">
           <svg className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
               d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -302,7 +302,9 @@ export default function Statistics({ sites, currentUser }) {
                   <div className="border-b border-gray-800 px-5 py-4">
                     <h2 className="text-base font-semibold text-white">Top 5 caméras les plus actives</h2>
                   </div>
-                  <table className="w-full">
+
+                  {/* Desktop / tablette large : tableau classique */}
+                  <table className="hidden w-full md:table">
                     <thead>
                       <tr className="border-b border-gray-800 bg-gray-900/50">
                         <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-widest text-gray-500">#</th>
@@ -324,6 +326,23 @@ export default function Statistics({ sites, currentUser }) {
                       ))}
                     </tbody>
                   </table>
+
+                  {/* Mobile : cartes empilées */}
+                  <div className="divide-y divide-gray-800 md:hidden">
+                    {topCameras.map((cam, i) => (
+                      <div key={cam.name} className="flex items-center gap-3 px-4 py-3.5">
+                        <span className="shrink-0 font-mono text-sm text-gray-600">#{i + 1}</span>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm text-gray-200">{cam.name}</p>
+                          <div className="mt-1 flex items-center gap-3 text-xs">
+                            <span className="text-cyan-400">Humain : {cam.human}</span>
+                            <span className="text-amber-400">Mouvement : {cam.motion}</span>
+                          </div>
+                        </div>
+                        <span className="shrink-0 text-lg font-bold text-white">{cam.total}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </>

@@ -61,6 +61,12 @@ const IconSidebarCollapse = ({ collapsed }) => (
   </svg>
 );
 
+const IconClose = () => (
+  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
+  </svg>
+);
+
 const StatusDot = ({ status }) => {
   const color = status === "online" ? "bg-emerald-400" : status === "sleep" ? "bg-amber-400" : "bg-red-400";
   return <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${color}`} />;
@@ -101,6 +107,8 @@ export default function Sidebar({
   collapsed,
   setCollapsed,
   currentUser,
+  mobileOpen,
+  setMobileOpen,
 }) {
   const [expandedSites, setExpandedSites]           = useState({ dakar: true });
   const [expandedAlertSites, setExpandedAlertSites] = useState({ dakar: true });
@@ -108,198 +116,263 @@ export default function Sidebar({
   const toggleSite  = (id) => setExpandedSites((p)     => ({ ...p, [id]: !p[id] }));
   const toggleAlert = (id) => setExpandedAlertSites((p) => ({ ...p, [id]: !p[id] }));
 
+  // Ferme le panneau mobile après toute navigation — pas d'effet sur desktop
+  // puisque mobileOpen n'y contrôle plus l'affichage (voir classes sur <aside>).
+  const closeMobile = () => setMobileOpen?.(false);
+
   const handleCameraClick = (camera, siteId) => {
     setSelectedSite(siteId);
     setSelectedCamera(camera);
     setCurrentPage("cameraView");
+    closeMobile();
   };
 
   const handleAlertCameraClick = (camera, siteId) => {
     setSelectedSite(siteId);
     setSelectedCamera(camera);
     setCurrentPage("alerts");
+    closeMobile();
   };
 
-  const sidebarWidth = collapsed ? "w-16" : "w-64";
+  // Sur mobile le panneau est toujours pleine largeur (w-64) quand ouvert ;
+  // le mode "réduit" (collapsed) ne s'applique qu'à partir de md.
+  const sidebarWidth = collapsed ? "w-64 md:w-16" : "w-64";
 
   return (
-    <aside className={`sidebar-el fixed left-0 top-0 z-30 flex h-screen flex-col border-r border-gray-800 bg-gray-950 transition-all duration-300 ease-in-out ${sidebarWidth}`}>
+    <>
+      {/* Backdrop mobile — visible uniquement quand le panneau est ouvert sur petit écran */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-black/60 md:hidden"
+          onClick={closeMobile}
+          aria-hidden="true"
+        />
+      )}
 
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-gray-800 px-3 py-4">
-        {!collapsed && (
-          <div className="flex flex-1 items-center justify-center overflow-hidden">
-            <img src={logo} alt="SONACOS" className="h-12 w-auto object-contain" />
-          </div>
-        )}
-        <button onClick={() => setCollapsed(!collapsed)}
-          className={`shrink-0 rounded-lg p-1.5 text-gray-500 transition hover:bg-gray-800 hover:text-gray-200 ${collapsed ? "mx-auto" : "ml-2"}`}
-          title={collapsed ? "Déplier la sidebar" : "Replier la sidebar"}>
-          <IconSidebarCollapse collapsed={collapsed} />
-        </button>
-      </div>
+      <aside className={`sidebar-el fixed left-0 top-0 z-40 flex h-screen flex-col border-r border-gray-800 bg-gray-950 transition-transform duration-300 ease-in-out
+        ${sidebarWidth}
+        ${mobileOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0`}>
 
-      <div className="flex-1 overflow-y-auto overflow-x-hidden py-4">
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-gray-800 px-3 py-4">
+          {!collapsed && (
+            <div className="flex flex-1 items-center justify-center overflow-hidden">
+              <img src={logo} alt="SONACOS" className="h-12 w-auto object-contain" />
+            </div>
+          )}
+          {/* Collapse — desktop uniquement, n'a pas de sens sur un panneau overlay mobile */}
+          <button onClick={() => setCollapsed(!collapsed)}
+            className={`hidden shrink-0 rounded-lg p-1.5 text-gray-500 transition hover:bg-gray-800 hover:text-gray-200 md:block ${collapsed ? "mx-auto" : "ml-2"}`}
+            title={collapsed ? "Déplier la sidebar" : "Replier la sidebar"}>
+            <IconSidebarCollapse collapsed={collapsed} />
+          </button>
+          {/* Fermer — mobile uniquement */}
+          <button onClick={closeMobile}
+            className="shrink-0 rounded-lg p-1.5 text-gray-500 transition hover:bg-gray-800 hover:text-gray-200 md:hidden"
+            title="Fermer le menu">
+            <IconClose />
+          </button>
+        </div>
 
-        {/* Navigation principale */}
-        <nav className={`mb-5 space-y-1 ${collapsed ? "px-2" : "px-3"}`}>
-          {navItems.map(({ id, label, Icon }) => {
-            const isActive = currentPage === id && (id !== "dashboard" || !selectedSite);
-            return (
-              <button key={id}
-                onClick={() => {
-                  setCurrentPage(id);
-                  if (id === "dashboard") setSelectedSite(null);
-                }}
-                title={collapsed ? label : undefined}
-                className={`flex w-full items-center rounded-xl transition
-                  ${collapsed ? "justify-center px-0 py-2.5" : "gap-3 px-3 py-2.5"}
-                  text-sm font-medium
-                  ${isActive
-                    ? "border border-cyan-500/20 bg-cyan-500/10 text-cyan-400"
-                    : "text-gray-400 hover:bg-gray-800/60 hover:text-gray-200"
-                  }`}
-              >
-                <span className={isActive ? "text-cyan-400" : "text-gray-500"}><Icon /></span>
-                {!collapsed && (
-                  <>
-                    <span className="flex-1 text-left">{label}</span>
-                    {isActive && <span className="h-1.5 w-1.5 rounded-full bg-cyan-400" />}
-                  </>
-                )}
-              </button>
-            );
-          })}
-        </nav>
+        <div className="flex-1 overflow-y-auto overflow-x-hidden py-4">
 
-        {/* Mode réduit */}
-        {collapsed ? (
-          <div className="px-2 space-y-1">
-            <div className="my-2 border-t border-gray-800" />
-            {sites.map((site) => {
-              const onlineCount = site.cameras.filter((c) => c.status === "online").length;
-              const isActive = currentPage === "dashboard" && selectedSite === site.id;
+          {/* Navigation principale */}
+          <nav className={`mb-5 space-y-1 ${collapsed ? "px-3 md:px-2" : "px-3"}`}>
+            {navItems.map(({ id, label, Icon }) => {
+              const isActive = currentPage === id && (id !== "dashboard" || !selectedSite);
               return (
-                <button key={site.id}
-                  onClick={() => { setSelectedSite(site.id); setCurrentPage("dashboard"); }}
-                  title={site.name}
-                  className={`relative flex w-full items-center justify-center rounded-xl py-2.5 transition
-                    ${isActive ? "border border-cyan-500/20 bg-cyan-500/10 text-cyan-400" : "text-gray-500 hover:bg-gray-800/60 hover:text-gray-300"}`}>
-                  <IconLocation />
-                  {onlineCount > 0 && <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-emerald-400" />}
+                <button key={id}
+                  onClick={() => {
+                    setCurrentPage(id);
+                    if (id === "dashboard") setSelectedSite(null);
+                    closeMobile();
+                  }}
+                  title={collapsed ? label : undefined}
+                  className={`flex w-full items-center rounded-xl transition
+                    ${collapsed ? "gap-3 px-3 py-2.5 md:justify-center md:px-0" : "gap-3 px-3 py-2.5"}
+                    text-sm font-medium
+                    ${isActive
+                      ? "border border-cyan-500/20 bg-cyan-500/10 text-cyan-400"
+                      : "text-gray-400 hover:bg-gray-800/60 hover:text-gray-200"
+                    }`}
+                >
+                  <span className={isActive ? "text-cyan-400" : "text-gray-500"}><Icon /></span>
+                  <span className={`flex-1 text-left ${collapsed ? "md:hidden" : ""}`}>{label}</span>
+                  {isActive && <span className={`h-1.5 w-1.5 rounded-full bg-cyan-400 ${collapsed ? "md:hidden" : ""}`} />}
                 </button>
               );
             })}
-          </div>
-        ) : (
-          <>
-            {/* Sites */}
-            <div className="mb-2 flex items-center gap-2 px-4">
-              <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-600">Sites</span>
-              <div className="flex-1 border-t border-gray-800" />
-            </div>
+          </nav>
 
-            <div className="mb-5 space-y-1 px-3">
-              {sites.map((site) => {
-                const isExpanded  = expandedSites[site.id] ?? false;
-                const isActive    = currentPage === "dashboard" && selectedSite === site.id;
-                const hasCameras  = Array.isArray(site.cameras) && site.cameras.length > 0;
-                const onlineCount = site.cameras.filter((c) => c.status === "online").length;
-                return (
-                  <div key={site.id}>
-                    <button onClick={() => { toggleSite(site.id); setSelectedSite(site.id); setCurrentPage("dashboard"); }}
-                      className={`flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm transition
-                        ${isActive ? "border border-cyan-500/20 bg-cyan-500/10 text-cyan-400" : "text-gray-300 hover:bg-gray-800/60"}`}>
-                      <span className={isActive ? "text-cyan-400" : "text-gray-500"}><IconLocation /></span>
-                      <span className="flex-1 truncate text-left font-medium">{site.name}</span>
-                      {onlineCount > 0 && (
-                        <span className="rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-medium text-emerald-400">{onlineCount}</span>
-                      )}
-                      <span className="rounded-full bg-gray-800 px-1.5 py-0.5 text-[10px] text-gray-500">{site.cameras.length}</span>
-                      <IconChevron open={isExpanded} />
+          {/* Mode réduit (desktop uniquement — sur mobile on affiche toujours la liste complète) */}
+          {collapsed ? (
+            <>
+              <div className="hidden px-2 space-y-1 md:block">
+                <div className="my-2 border-t border-gray-800" />
+                {sites.map((site) => {
+                  const onlineCount = site.cameras.filter((c) => c.status === "online").length;
+                  const isActive = currentPage === "dashboard" && selectedSite === site.id;
+                  return (
+                    <button key={site.id}
+                      onClick={() => { setSelectedSite(site.id); setCurrentPage("dashboard"); }}
+                      title={site.name}
+                      className={`relative flex w-full items-center justify-center rounded-xl py-2.5 transition
+                        ${isActive ? "border border-cyan-500/20 bg-cyan-500/10 text-cyan-400" : "text-gray-500 hover:bg-gray-800/60 hover:text-gray-300"}`}>
+                      <IconLocation />
+                      {onlineCount > 0 && <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-emerald-400" />}
                     </button>
-                    {hasCameras && <div className="px-3"><SiteStatusBar cameras={site.cameras} /></div>}
-                    {isExpanded && hasCameras && (
-                      <div className="mt-1 space-y-0.5 pl-3">
-                        {site.cameras.map((camera) => {
-                          const key = camera.id || camera.deviceId;
-                          const isSel = (selectedCamera?.id || selectedCamera?.deviceId) === key && currentPage === "cameraView";
-                          return (
-                            <button key={key} onClick={() => handleCameraClick(camera, site.id)}
-                              className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs transition
-                                ${isSel ? "bg-gray-800 text-cyan-400" : "text-gray-500 hover:bg-gray-800/40 hover:text-gray-300"}`}>
-                              <span className={isSel ? "text-cyan-400" : "text-gray-600"}><IconCamera /></span>
-                              <span className="flex-1 truncate">{camera.name}</span>
-                              <StatusDot status={camera.status} />
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-                    {isExpanded && !hasCameras && <p className="px-3 py-2 text-xs text-gray-600">Aucune caméra</p>}
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+              {/* Sur mobile, même état "collapsed" affiche la liste complète des sites/alertes */}
+              <div className="md:hidden">
+                <SitesAndAlertsSections
+                  sites={sites}
+                  currentPage={currentPage}
+                  selectedSite={selectedSite}
+                  setSelectedSite={setSelectedSite}
+                  setCurrentPage={setCurrentPage}
+                  expandedSites={expandedSites}
+                  toggleSite={toggleSite}
+                  expandedAlertSites={expandedAlertSites}
+                  toggleAlert={toggleAlert}
+                  selectedCamera={selectedCamera}
+                  handleCameraClick={handleCameraClick}
+                  handleAlertCameraClick={handleAlertCameraClick}
+                />
+              </div>
+            </>
+          ) : (
+            <SitesAndAlertsSections
+              sites={sites}
+              currentPage={currentPage}
+              selectedSite={selectedSite}
+              setSelectedSite={setSelectedSite}
+              setCurrentPage={setCurrentPage}
+              expandedSites={expandedSites}
+              toggleSite={toggleSite}
+              expandedAlertSites={expandedAlertSites}
+              toggleAlert={toggleAlert}
+              selectedCamera={selectedCamera}
+              handleCameraClick={handleCameraClick}
+              handleAlertCameraClick={handleAlertCameraClick}
+            />
+          )}
+        </div>
 
-            {/* Alertes */}
-            <div className="mb-2 flex items-center gap-2 px-4">
-              <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-600">Alertes</span>
-              <div className="flex-1 border-t border-gray-800" />
-            </div>
-
-            <div className="space-y-1 px-3">
-              {sites.map((site) => {
-                const isExpanded = expandedAlertSites[site.id] ?? false;
-                const isActive   = currentPage === "alerts" && selectedSite === site.id;
-                const hasCameras = Array.isArray(site.cameras) && site.cameras.length > 0;
-                return (
-                  <div key={`alert-${site.id}`}>
-                    <button onClick={() => { toggleAlert(site.id); setSelectedSite(site.id); setCurrentPage("alerts"); }}
-                      className={`flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm transition
-                        ${isActive ? "border border-cyan-500/20 bg-cyan-500/10 text-cyan-400" : "text-gray-300 hover:bg-gray-800/60"}`}>
-                      <span className={isActive ? "text-cyan-400" : "text-gray-500"}><IconLocation /></span>
-                      <span className="flex-1 truncate text-left font-medium">{site.name}</span>
-                      <span className="rounded-full bg-gray-800 px-1.5 py-0.5 text-[10px] text-gray-500">{site.cameras.length}</span>
-                      <IconChevron open={isExpanded} />
-                    </button>
-                    {isExpanded && hasCameras && (
-                      <div className="mt-1 space-y-0.5 pl-3">
-                        {site.cameras.map((camera) => {
-                          const key = camera.id || camera.deviceId;
-                          const isSel = (selectedCamera?.id || selectedCamera?.deviceId) === key && currentPage === "alerts";
-                          return (
-                            <button key={`alert-cam-${key}`} onClick={() => handleAlertCameraClick(camera, site.id)}
-                              className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs transition
-                                ${isSel ? "bg-gray-800 text-cyan-400" : "text-gray-500 hover:bg-gray-800/40 hover:text-gray-300"}`}>
-                              <span className={isSel ? "text-cyan-400" : "text-gray-600"}><IconCamera /></span>
-                              <span className="flex-1 truncate">{camera.name}</span>
-                              <StatusDot status={camera.status} />
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-                    {isExpanded && !hasCameras && <p className="px-3 py-2 text-xs text-gray-600">Aucune caméra</p>}
-                  </div>
-                );
-              })}
-            </div>
-          </>
-        )}
-      </div>
-
-      {/* Footer */}
-      <div className={`border-t border-gray-800 px-3 py-3 ${collapsed ? "flex justify-center" : ""}`}>
-        {collapsed ? (
-          <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
-        ) : (
+        {/* Footer */}
+        <div className={`border-t border-gray-800 px-3 py-3 ${collapsed ? "flex justify-center md:flex" : ""}`}>
           <div className="flex items-center gap-2">
             <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
-            <span className="text-xs text-gray-600">Système opérationnel</span>
+            <span className={`text-xs text-gray-600 ${collapsed ? "md:hidden" : ""}`}>Système opérationnel</span>
           </div>
-        )}
+        </div>
+      </aside>
+    </>
+  );
+}
+
+// ─── Sections Sites + Alertes (extraites pour être réutilisées en mode
+//     "collapsed desktop mais mobile ouvert") ───────────────────────────────
+function SitesAndAlertsSections({
+  sites, currentPage, selectedSite, setSelectedSite, setCurrentPage,
+  expandedSites, toggleSite, expandedAlertSites, toggleAlert,
+  selectedCamera, handleCameraClick, handleAlertCameraClick,
+}) {
+  return (
+    <>
+      {/* Sites */}
+      <div className="mb-2 flex items-center gap-2 px-4">
+        <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-600">Sites</span>
+        <div className="flex-1 border-t border-gray-800" />
       </div>
-    </aside>
+
+      <div className="mb-5 space-y-1 px-3">
+        {sites.map((site) => {
+          const isExpanded  = expandedSites[site.id] ?? false;
+          const isActive    = currentPage === "dashboard" && selectedSite === site.id;
+          const hasCameras  = Array.isArray(site.cameras) && site.cameras.length > 0;
+          const onlineCount = site.cameras.filter((c) => c.status === "online").length;
+          return (
+            <div key={site.id}>
+              <button onClick={() => { toggleSite(site.id); setSelectedSite(site.id); setCurrentPage("dashboard"); }}
+                className={`flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm transition
+                  ${isActive ? "border border-cyan-500/20 bg-cyan-500/10 text-cyan-400" : "text-gray-300 hover:bg-gray-800/60"}`}>
+                <span className={isActive ? "text-cyan-400" : "text-gray-500"}><IconLocation /></span>
+                <span className="flex-1 truncate text-left font-medium">{site.name}</span>
+                {onlineCount > 0 && (
+                  <span className="rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-medium text-emerald-400">{onlineCount}</span>
+                )}
+                <span className="rounded-full bg-gray-800 px-1.5 py-0.5 text-[10px] text-gray-500">{site.cameras.length}</span>
+                <IconChevron open={isExpanded} />
+              </button>
+              {hasCameras && <div className="px-3"><SiteStatusBar cameras={site.cameras} /></div>}
+              {isExpanded && hasCameras && (
+                <div className="mt-1 space-y-0.5 pl-3">
+                  {site.cameras.map((camera) => {
+                    const key = camera.id || camera.deviceId;
+                    const isSel = (selectedCamera?.id || selectedCamera?.deviceId) === key && currentPage === "cameraView";
+                    return (
+                      <button key={key} onClick={() => handleCameraClick(camera, site.id)}
+                        className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs transition
+                          ${isSel ? "bg-gray-800 text-cyan-400" : "text-gray-500 hover:bg-gray-800/40 hover:text-gray-300"}`}>
+                        <span className={isSel ? "text-cyan-400" : "text-gray-600"}><IconCamera /></span>
+                        <span className="flex-1 truncate">{camera.name}</span>
+                        <StatusDot status={camera.status} />
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              {isExpanded && !hasCameras && <p className="px-3 py-2 text-xs text-gray-600">Aucune caméra</p>}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Alertes */}
+      <div className="mb-2 flex items-center gap-2 px-4">
+        <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-600">Alertes</span>
+        <div className="flex-1 border-t border-gray-800" />
+      </div>
+
+      <div className="space-y-1 px-3">
+        {sites.map((site) => {
+          const isExpanded = expandedAlertSites[site.id] ?? false;
+          const isActive   = currentPage === "alerts" && selectedSite === site.id;
+          const hasCameras = Array.isArray(site.cameras) && site.cameras.length > 0;
+          return (
+            <div key={`alert-${site.id}`}>
+              <button onClick={() => { toggleAlert(site.id); setSelectedSite(site.id); setCurrentPage("alerts"); }}
+                className={`flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm transition
+                  ${isActive ? "border border-cyan-500/20 bg-cyan-500/10 text-cyan-400" : "text-gray-300 hover:bg-gray-800/60"}`}>
+                <span className={isActive ? "text-cyan-400" : "text-gray-500"}><IconLocation /></span>
+                <span className="flex-1 truncate text-left font-medium">{site.name}</span>
+                <span className="rounded-full bg-gray-800 px-1.5 py-0.5 text-[10px] text-gray-500">{site.cameras.length}</span>
+                <IconChevron open={isExpanded} />
+              </button>
+              {isExpanded && hasCameras && (
+                <div className="mt-1 space-y-0.5 pl-3">
+                  {site.cameras.map((camera) => {
+                    const key = camera.id || camera.deviceId;
+                    const isSel = (selectedCamera?.id || selectedCamera?.deviceId) === key && currentPage === "alerts";
+                    return (
+                      <button key={`alert-cam-${key}`} onClick={() => handleAlertCameraClick(camera, site.id)}
+                        className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs transition
+                          ${isSel ? "bg-gray-800 text-cyan-400" : "text-gray-500 hover:bg-gray-800/40 hover:text-gray-300"}`}>
+                        <span className={isSel ? "text-cyan-400" : "text-gray-600"}><IconCamera /></span>
+                        <span className="flex-1 truncate">{camera.name}</span>
+                        <StatusDot status={camera.status} />
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              {isExpanded && !hasCameras && <p className="px-3 py-2 text-xs text-gray-600">Aucune caméra</p>}
+            </div>
+          );
+        })}
+      </div>
+    </>
   );
 }

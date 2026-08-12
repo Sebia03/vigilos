@@ -7,6 +7,7 @@ import Playback from "./pages/Playback";
 import Alerts from "./pages/Alerts";
 import Settings from "./pages/Settings";
 import Statistics from "./pages/Statistics";
+import MultiView from "./pages/MultiView";
 import Login from "./pages/Login";
 import { ThemeProvider } from "./context/ThemeContext";
 import { fetchImouCameras } from "./services/ImouService";
@@ -98,7 +99,15 @@ function DashboardSkeleton() {
   );
 }
 
+// ─── Icône hamburger (mobile uniquement) ──────────────────────────────────────
+const IconMenu = () => (
+  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3.75 6.75h16.5M3.75 12h16.5M3.75 17.25h16.5" />
+  </svg>
+);
+
 const REFRESH_INTERVAL = 120000;
+const VALID_PAGES = ["dashboard", "statistics", "playback", "alerts", "settings"];
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -112,6 +121,8 @@ function App() {
   const [lastUpdated, setLastUpdated]         = useState(null);
   const [refreshing, setRefreshing]           = useState(false);
   const [collapsed, setCollapsed]             = useState(false);
+  const [multiViewOpen, setMultiViewOpen]     = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   useEffect(() => {
     const token = getToken();
@@ -121,6 +132,15 @@ function App() {
       .catch(() => { removeToken(); setIsAuthenticated(false); })
       .finally(() => setCheckingAuth(false));
   }, []);
+
+  // Ouvrir directement une page depuis l'URL hash (ex: /#statistics)
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const hash = window.location.hash.replace("#", "");
+    if (hash && VALID_PAGES.includes(hash)) {
+      setCurrentPage(hash);
+    }
+  }, [isAuthenticated]);
 
   const handleLoginSuccess = (user, token) => {
     setToken(token);
@@ -204,6 +224,12 @@ function App() {
   return (
     <ThemeProvider>
       <div className="min-h-screen bg-gray-950 text-white">
+
+        {/* Mode multi-écran — overlay plein écran */}
+        {multiViewOpen && (
+          <MultiView sites={sites} onClose={() => setMultiViewOpen(false)} />
+        )}
+
         <Sidebar
           sites={sites}
           currentPage={currentPage}
@@ -215,9 +241,24 @@ function App() {
           collapsed={collapsed}
           setCollapsed={setCollapsed}
           currentUser={currentUser}
+          mobileOpen={mobileSidebarOpen}
+          setMobileOpen={setMobileSidebarOpen}
         />
-        <main className="min-h-screen transition-all duration-300"
-          style={{ marginLeft: collapsed ? "64px" : "256px" }}>
+
+        {/* Bouton hamburger — mobile uniquement, flottant au-dessus du contenu */}
+        <button
+          onClick={() => setMobileSidebarOpen(true)}
+          className="fixed left-4 top-4 z-[9999] rounded-lg border border-gray-800 bg-gray-900 p-2 text-gray-300 shadow-lg md:hidden"
+          title="Ouvrir le menu"
+        >
+          <IconMenu />
+        </button>
+
+        <main
+          className={`min-h-screen transition-all duration-300 ml-0 pt-14 md:pt-0 ${
+            collapsed ? "md:ml-16" : "md:ml-64"
+          }`}
+        >
           <Navbar
             refreshing={refreshing}
             lastUpdated={lastUpdated}
@@ -236,6 +277,7 @@ function App() {
                   selectedCamera={selectedCamera}
                   setSelectedCamera={setSelectedCamera}
                   setCurrentPage={setCurrentPage}
+                  onMultiView={() => setMultiViewOpen(true)}
                 />
               )}
               {currentPage === "cameraView" && (

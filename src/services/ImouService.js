@@ -11,7 +11,7 @@ export async function fetchKitToken(deviceId, channelId = 0) {
   const response = await axios.post(`${BASE_URL}/kit-token`, {
     deviceId,
     channelId,
-    type: "1",
+    type: "0",
   });
 
   return response.data;
